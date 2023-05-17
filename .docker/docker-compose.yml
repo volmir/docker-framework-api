@@ -1,0 +1,47 @@
+version: "3"
+
+services:
+    db:
+        image: mysql:8.0.33
+        platform: linux/x86_64
+        command: --default-authentication-plugin=mysql_native_password
+        volumes:
+            - "./mysql/db:/var/lib/mysql"
+        environment:
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            MYSQL_DATABASE: ${MYSQL_DATABASE}
+            MYSQL_USER: ${MYSQL_USER}
+            MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+        ports:
+            - 33060:3306
+        networks:
+            - no_framevork_api
+    php:
+        build:
+            context: ./php
+            args:
+                TIMEZONE: ${TIMEZONE}
+        volumes:
+            - ../:/var/www/appilcation:cached        
+            - ../vendor:/var/www/appilcation/vendor
+        networks:
+            - no_framevork_api
+    nginx:
+        build:
+            context: ./nginx
+        volumes:
+            - ../:/var/www/appilcation:cached
+            - ../vendor:/var/www/appilcation/vendor
+        ports:
+            - 8082:80
+        networks:
+            - no_framevork_api
+        env_file:
+            - .env.nginx.local        
+
+#volumes:    
+#    no_framevork_api_vendor:     
+#    db_app:    
+
+networks:
+    no_framevork_api:
