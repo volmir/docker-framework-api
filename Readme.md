@@ -8,7 +8,7 @@ No Framework API.
 
 This is a complete stack for running web application into Docker containers using docker-compose tool.
 
-It is composed by 4 containers:
+It is composed by 3 containers:
 - `nginx`, acting as the webserver.
 - `php`, the PHP-FPM container with the 8.0 version of PHP.
 - `db` which is the MySQL database container with a **MySQL 8.0** image.
