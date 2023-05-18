@@ -17,11 +17,11 @@ return [
             'dbname' => 'production',
         ],
         'test' => [
-            'host' => 'localhost',
+            'host' => 'db',
             'port' => 3306,
-            'username' => 'root',
-            'password' => '',
-            'dbname' => 'test',
+            'username' => 'user',
+            'password' => 'password',
+            'dbname' => 'no_framework_api',
         ],                
     ], 
 ];

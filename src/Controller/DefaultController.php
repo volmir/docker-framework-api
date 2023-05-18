@@ -8,11 +8,10 @@ class DefaultController extends BaseController
 {
     public function index()
     {
-        $content = [
+        $this->content = [
             'time' => date('Y-m-d H:i:s'),
         ];
-        $this->response->setContent($content);
-        $this->response->outputJson();
+        $this->send();
     }
 
 }

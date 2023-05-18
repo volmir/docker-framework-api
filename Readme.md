@@ -22,7 +22,22 @@ It is composed by 4 containers:
 5. Inside the `php` container, run `composer install` to install dependencies from `/var/www/application/vendor` folder.
 6. Shutdown server. Run `docker-compose stop` and `docker-compose rm -f`
 
-## Usefull commands
+## Run PHPUnit tests
+
+```sh
+$ cd ./.docker/test
+$ docker-compose -f docker-compose.test.yml run tests
+```
+
+## Database dump
+
+See export file `db_dump.sql` in /docs directory.
+
+## Usage Postman
+
+Run application in Postman. See export collection in /docs directory.
+
+## Usefull Docker commands
 
 ```sh
 $ docker-compose up -d

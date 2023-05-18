@@ -20,7 +20,7 @@ class Application
         $router->dispatch();
     }    
 
-    protected function setParams()
+    public function setParams()
     {
         define('DB_HOST', $this->config['db'][$this->environment]['host']);
         define('DB_PORT', $this->config['db'][$this->environment]['port']);

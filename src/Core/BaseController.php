@@ -4,25 +4,13 @@ namespace App\Core;
 
 use App\Core\Request;
 use App\Core\Response;
-use App\Core\Db;
 use App\Auth\Guard;
 
 class BaseController
 {
-    /**
-     * @var Request 
-     */
-    protected $request;
-
-    /**
-     * @var Response 
-     */
-    protected $response;
-
-    /**
-     * @var \PDO 
-     */
-    protected $pdo;
+    protected Request $request;
+    protected Response $response;
+    protected mixed $content = [];
 
     public function __construct() 
     {
@@ -31,9 +19,11 @@ class BaseController
         $this->guard();
     }
 
-    public function initDb()
+    public function send()
     {
-        $this->pdo = Db::getInstance();
+        $this->checkErrors();
+        $this->response->setContent($this->content);
+        $this->response->outputJson();        
     }
 
     protected function guard()
@@ -46,4 +36,21 @@ class BaseController
             exit();
         }
     }
+
+    protected function checkErrors() 
+    {
+        if (isset($this->content['error'])) {
+            if ($this->content['error'] == 'Bad Request') {
+                $this->response->setHeader('HTTP/1.1 400 Bad Request');
+            } elseif ($this->content['error'] == 'Method Not Allowed') {
+                $this->response->setHeader('HTTP/1.1 405 Method Not Allowed');
+            } else {
+                $this->response->setHeader('HTTP/1.1 500 Internal Server Error');
+            }
+        } elseif (isset($this->content['success'])) {
+            if ($this->content['success'] == 'Created') {
+                $this->response->setHeader('HTTP/1.1 201 Created');
+            }
+        }         
+    }   
 }

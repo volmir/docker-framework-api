@@ -6,7 +6,10 @@ class Environment
 {
     const DEVELOP_SERVERS = [
         '127.0.0.1',
+        '172.18.0.1',
+        '172.18.0.2',
         '172.18.0.3',
+        '172.18.0.4',
     ];
 
     /**
@@ -14,7 +17,7 @@ class Environment
      */
     public static function get() 
     {
-        $environment = 'develop';     
+        $environment = 'develop';
         if (!in_array($_SERVER['SERVER_ADDR'], static::DEVELOP_SERVERS)) {
             $environment = 'production'; 
         }        
