@@ -25,6 +25,7 @@ It is composed by 3 containers:
 ## Run PHPUnit tests
 
 ```sh
+$ cd ./.docker
 $ docker-compose exec php composer test
 ```
 
