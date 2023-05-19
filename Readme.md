@@ -25,8 +25,7 @@ It is composed by 3 containers:
 ## Run PHPUnit tests
 
 ```sh
-$ cd ./.docker/test
-$ docker-compose -f docker-compose.test.yml run tests
+$ docker-compose exec php composer test
 ```
 
 ## Database dump
