@@ -4,7 +4,7 @@ namespace App\Service;
 
 use App\Repository\ItemRepository;
 use App\Validator\ItemValidator;
-use App\Logger\AppLogger;
+use App\Logger\LoggerAdapter;
 use App\Core\Log\Logger;
 
 class ItemService
@@ -17,7 +17,7 @@ class ItemService
     {
         $this->itemRepository = new ItemRepository();
         $this->itemValidator = new ItemValidator();
-        $this->logger = AppLogger::init();
+        $this->logger = LoggerAdapter::init();
     }    
 
     public function find($id) 

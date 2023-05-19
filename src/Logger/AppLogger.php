@@ -5,7 +5,7 @@ namespace App\Logger;
 use App\Core\Log\Handler\FileHandler;
 use App\Core\Log\Logger;
 
-class AppLogger
+class LoggerAdapter
 {
     public static function init(): Logger
     {
