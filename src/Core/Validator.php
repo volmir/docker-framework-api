@@ -1,31 +1,30 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Core;
 
 class Validator
-{    
-    public $errors = [];
+{
+    /** @var list<string> */
+    public array $errors = [];
 
-    public function setError(string $error) 
+    public function setError(string $error): void
     {
         $this->errors[] = $error;
     }
 
-    public function getErrors(): array 
+    public function getErrors(): array
     {
         return $this->errors;
-    } 
+    }
 
-    public function clear()
+    public function clear(): void
     {
         $this->errors = [];
-    }     
-    
+    }
+
     public function isValid(): bool
     {
-        if (count($this->errors) == 0) {
-            return true;
-        }
-        return false;
-    }     
+        return count($this->errors) === 0;
+    }
 }

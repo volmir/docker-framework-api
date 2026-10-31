@@ -1,7 +1,7 @@
 server {
     listen 80;
     server_name ${NGINX_BACKEND_DOMAIN};
-    root /var/www/appilcation/public;
+    root /var/www/application/public;
 
     location / {
         try_files $uri /index.php$is_args$args;
@@ -33,6 +33,6 @@ server {
         return 404;
     }
 
-    error_log /dev/stdout info;
-    access_log /var/log/nginx/project_access.log;
+    error_log /dev/stderr info;
+    access_log /dev/stdout;
 }

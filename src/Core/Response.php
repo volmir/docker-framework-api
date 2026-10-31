@@ -1,79 +1,56 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Core;
 
 class Response
 {
-    /**
-     * @var array
-     */
-    protected $headers = [];
+    /** @var list<string> */
+    protected array $headers = [];
 
-    /**
-     * @var mixed 
-     */
-    protected $content;
-  
+    protected mixed $content = null;
 
-    /**
-     * @param string $content
-     */
-    public function setContent($content = '')
+    public function setContent(mixed $content = ''): void
     {
         $this->content = $content;
-    }    
-    
-    /**
-     * @return mixed
-     */
-    public function getContent()
+    }
+
+    public function getContent(): mixed
     {
         return $this->content;
     }
-    
-    /**
-     * @param string $value
-     */    
-    public function setHeader($value)
-    {
-        $this->headers[] = (string)$value;
-    }  
 
-    /**
-     * @return array
-     */
-    public function getHeaders()
+    public function setHeader(string $value): void
+    {
+        $this->headers[] = $value;
+    }
+
+    public function getHeaders(): array
     {
         return $this->headers;
     }
 
-    /**
-     * @return void
-     */
-    public function sendHeaders()
+    public function sendHeaders(): void
     {
         foreach ($this->headers as $header) {
             header($header);
         }
-    }      
+    }
 
-    /**
-     * @param string $url
-     */
-    public static function redirect($url) 
+    public static function redirect(string $url): void
     {
-        $responce = new self();
-        $responce->setHeader('Location: ' . $url);
-        $responce->sendHeaders();
-    }     
+        $response = new self();
+        $response->setHeader('Location: ' . $url);
+        $response->sendHeaders();
+    }
 
-    public function output() 
+    public function output(): void
     {
         $this->sendHeaders();
         echo $this->getContent();
     }
-    
-    public function outputJson() 
+
+    public function outputJson(): void
     {
         $this->setHeader('Content-Type: application/json');
         $this->sendHeaders();

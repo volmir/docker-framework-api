@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Controller;
 
@@ -8,7 +9,7 @@ use App\Service\ItemService;
 
 class ItemsController extends BaseController
 {
-    protected ItemService $itemService; 
+    protected ItemService $itemService;
 
     public function __construct()
     {
@@ -16,27 +17,27 @@ class ItemsController extends BaseController
         $this->itemService = new ItemService();
     }
 
-    public function index()
+    public function index(): void
     {
         if ($this->request->requestMethod != Request::METHOD_GET) {
-            $this->content = ['error' => 'Method Not Allowed'];   
+            $this->content = ['error' => 'Method Not Allowed'];
         } else {
             $this->content = $this->itemService->findAll();
         }
         $this->send();
     }
 
-    public function show()
+    public function show(): void
     {
         if ($this->request->requestMethod != Request::METHOD_GET) {
             $this->content = ['error' => 'Method Not Allowed'];
         } else {
-            $this->content = $this->itemService->find($this->request->queryData['id']);
+            $this->content = $this->itemService->find((int) ($this->request->queryData['id'] ?? 0));
         }
         $this->send();
-    }  
+    }
 
-    public function store()
+    public function store(): void
     {
         if ($this->request->requestMethod != Request::METHOD_POST) {
             $this->content = ['error' => 'Method Not Allowed'];
@@ -44,24 +45,24 @@ class ItemsController extends BaseController
             $this->content = $this->itemService->store($this->request->formData);
         }
         $this->send();
-    }    
+    }
 
-    public function update()
+    public function update(): void
     {
         if (!in_array($this->request->requestMethod, [Request::METHOD_PUT, Request::METHOD_PATCH])) {
             $this->content = ['error' => 'Method Not Allowed'];
         } else {
             $this->content = $this->itemService->update($this->request->formData);
-        }        
+        }
         $this->send();
     }
 
-    public function destroy()
+    public function destroy(): void
     {
         if ($this->request->requestMethod != Request::METHOD_DELETE) {
             $this->content = ['error' => 'Method Not Allowed'];
         } else {
-            $this->content = $this->itemService->destroy($this->request->queryData['id']);
+            $this->content = $this->itemService->destroy((int) ($this->request->queryData['id'] ?? 0));
         }
         $this->send();
     }

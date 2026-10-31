@@ -1,13 +1,14 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Model;
 
 class Item
 {
-    public $id;
-    public $name;
-    public $phone;
-    public $key;
-    public $created_at;
-    public $updated_at;
+    public int|string|null $id = null;
+    public ?string $name = null;
+    public ?string $phone = null;
+    public ?string $key = null;
+    public ?string $created_at = null;
+    public ?string $updated_at = null;
 }

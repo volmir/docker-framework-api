@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Logger;
 
@@ -10,8 +11,8 @@ class LoggerAdapter
     public static function init(): Logger
     {
         $logFileName = dirname(__DIR__) . '/../logs/' . date('Y-m-d') . '.log';
-    
+
         $handler = new FileHandler($logFileName);
-        return new Logger($handler);           
+        return new Logger($handler);
     }
 }

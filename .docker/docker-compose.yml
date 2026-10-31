@@ -1,10 +1,8 @@
-version: "3"
-
 services:
     db:
-        image: mysql:8.0.33
-        platform: linux/x86_64
-        command: --default-authentication-plugin=mysql_native_password
+        image: mysql:9.7
+        # Keep database files on the persistent mount while protecting the image filesystem.
+        read_only: true
         volumes:
             - "./mysql/db:/var/lib/mysql"
         environment:
@@ -14,32 +12,100 @@ services:
             MYSQL_PASSWORD: ${MYSQL_PASSWORD}
         ports:
             - 33060:3306
+        tmpfs:
+            - /tmp:rw,noexec,nosuid,size=64m
+            - /var/run/mysqld:rw,noexec,nosuid,size=16m
+        healthcheck:
+            test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "3"
+        deploy:
+            resources:
+                limits:
+                    cpus: "1.0"
+                    memory: 1G
         networks:
             - no_framevork_api
     php:
+        image: myapp-php
         build:
-            context: ./php
+            context: ..
+            dockerfile: .docker/php/Dockerfile
             args:
                 TIMEZONE: ${TIMEZONE}
+        # PHP-FPM needs temporary runtime files; application logs use the writable logs mount.
+        # On the host, ../logs must be writable by the container's UID 1000.
+        read_only: true
         volumes:
-            - ../:/var/www/appilcation:cached        
-            - ../logs:/var/www/appilcation/logs
-            - ../vendor:/var/www/appilcation/vendor
+            - ../:/var/www/application:ro
+            - ../logs:/var/www/application/logs
+            - ../vendor:/var/www/application/vendor:ro
+        tmpfs:
+            - /tmp:rw,noexec,nosuid,size=64m,uid=1000,gid=1000,mode=1770
+        healthcheck:
+            test: ["CMD-SHELL", "php-fpm -t || exit 1"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+        depends_on:
+            db:
+                condition: service_healthy
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "3"
+        deploy:
+            resources:
+                # Production resource caps; size these values for the target workload.
+                limits:
+                    cpus: "1.0"
+                    memory: 1G
         networks:
             - no_framevork_api
     nginx:
         build:
             context: ./nginx
+        depends_on:
+            php:
+                condition: service_healthy
+        # NGINX writes only its generated config, pid, and cache to temporary mounts.
+        read_only: true
         volumes:
-            - ../:/var/www/appilcation:cached
-            - ../logs:/var/www/appilcation/logs
-            - ../vendor:/var/www/appilcation/vendor
+            - ../:/var/www/application:ro
+        tmpfs:
+            - /etc/nginx/conf.d:rw,noexec,nosuid,size=16m
+            - /var/cache/nginx/client_temp:rw,noexec,nosuid,size=32m,uid=101,gid=101,mode=0750
+            - /var/cache/nginx/proxy_temp:rw,noexec,nosuid,size=32m,uid=101,gid=101,mode=0750
+            - /var/cache/nginx/fastcgi_temp:rw,noexec,nosuid,size=32m,uid=101,gid=101,mode=0750
+            - /var/cache/nginx/uwsgi_temp:rw,noexec,nosuid,size=32m,uid=101,gid=101,mode=0750
+            - /var/cache/nginx/scgi_temp:rw,noexec,nosuid,size=32m,uid=101,gid=101,mode=0750
+            - /var/run:rw,noexec,nosuid,size=16m
+            - /tmp:rw,noexec,nosuid,size=16m
         ports:
             - 8082:80
         networks:
             - no_framevork_api
         env_file:
             - .env.nginx.local        
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "3"
+        deploy:
+            resources:
+                limits:
+                    cpus: "0.5"
+                    memory: 256M
 
 #volumes:    
 #    no_framevork_api_vendor:     

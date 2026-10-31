@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Core;
 
@@ -12,21 +13,21 @@ class BaseController
     protected Response $response;
     protected mixed $content = [];
 
-    public function __construct() 
+    public function __construct()
     {
-        $this->request = new Request;
-        $this->response = new Response;
+        $this->request = new Request();
+        $this->response = new Response();
         $this->guard();
     }
 
-    public function send()
+    public function send(): void
     {
         $this->checkErrors();
         $this->response->setContent($this->content);
-        $this->response->outputJson();        
+        $this->response->outputJson();
     }
 
-    protected function guard()
+    protected function guard(): void
     {
         $guard = new Guard();
         if (!$guard->authToken($this->request->getHeaders())) {
@@ -37,7 +38,7 @@ class BaseController
         }
     }
 
-    protected function checkErrors() 
+    protected function checkErrors(): void
     {
         if (isset($this->content['error'])) {
             if ($this->content['error'] == 'Bad Request') {
@@ -51,6 +52,6 @@ class BaseController
             if ($this->content['success'] == 'Created') {
                 $this->response->setHeader('HTTP/1.1 201 Created');
             }
-        }         
-    }   
+        }
+    }
 }

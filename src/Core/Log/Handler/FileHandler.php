@@ -1,13 +1,11 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Core\Log\Handler;
 
 class FileHandler implements HandlerInterface
 {
-    /**
-     * @var string
-     */
-    private $filename;
+    private string $filename;
 
     public function __construct(string $filename)
     {

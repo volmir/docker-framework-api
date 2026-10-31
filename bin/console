@@ -1,0 +1,9 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+require __DIR__ . '/../src/bootstrap.php';
+require __DIR__ . '/../src/Console/Console.php';
+
+$console = new App\Console\Console(__DIR__ . '/../commands');
+exit($console->run($argv));

@@ -1,0 +1,5 @@
+.git
+.docker/mysql/db
+logs
+tests
+vendor

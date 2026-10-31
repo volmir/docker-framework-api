@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Service;
 
@@ -8,7 +9,7 @@ use App\Logger\LoggerAdapter;
 use App\Core\Log\Logger;
 
 class ItemService
-{    
+{
     protected ItemRepository $itemRepository;
     protected ItemValidator $itemValidator;
     protected Logger $logger;
@@ -18,14 +19,12 @@ class ItemService
         $this->itemRepository = new ItemRepository();
         $this->itemValidator = new ItemValidator();
         $this->logger = LoggerAdapter::init();
-    }    
+    }
 
-    public function find($id) 
+    public function find(int $id): array|false
     {
         $result = [];
-        $id = (int)$id;
-
-        if ($this->itemValidator->validateId($id)) {         
+        if ($this->itemValidator->validateId($id)) {
             $result = $this->itemRepository->find($id);
         } else {
             $result = [
@@ -36,48 +35,48 @@ class ItemService
         return $result;
     }
 
-    public function findAll(int $start = 0, int $stop = 20) 
+    public function findAll(int $start = 0, int $stop = 20): array
     {
         return $this->itemRepository->findAll($start, $stop);
     }
 
-    public function store(array $params = [])
+    public function store(array $params = []): array
     {
         $params['created_at'] = date('Y-m-d H:i:s');
         $params['updated_at'] = date('Y-m-d H:i:s');
 
-        if ($this->itemValidator->validateStore($params)) {  
+        if ($this->itemValidator->validateStore($params)) {
             if ($this->itemRepository->store($params)) {
                 $lastInsertId = $this->itemRepository->lastInsertId();
                 $result = [
                     'success' => 'Created',
-                    'item' => $this->itemRepository->find($lastInsertId['LAST_INSERT_ID()']),
-                ];        
+                    'item' => $this->itemRepository->find((int) $lastInsertId),
+                ];
             } else {
                 $result = ['error' => 'DB error'];
-            }              
+            }
         } else {
             $result = [
                 'error' => 'Bad Request',
                 'errors' => $this->itemValidator->getErrors(),
             ];
         }
-        return $result;        
+        return $result;
     }
-    
-    public function update(array $params = [])
+
+    public function update(array $params = []): array
     {
         $result = [];
-        $params['update_at'] = date('Y-m-d H:i:s');
-        $params['id'] = (int)($params['id'] ?? '');
+        $params['updated_at'] = date('Y-m-d H:i:s');
+        $params['id'] = (int) ($params['id'] ?? '');
 
-        if ($this->itemValidator->validateUpdate($params)) {  
-            $item = $this->itemRepository->find($params['id']);           
-            if (!empty($item)) {            
-                if ($this->itemRepository->update($params)) {    
+        if ($this->itemValidator->validateUpdate($params)) {
+            $item = $this->itemRepository->find($params['id']);
+            if (!empty($item)) {
+                if ($this->itemRepository->update($params)) {
                     $result = ['success' => 'Updated'];
-    
-                    $this->logger->log(\Psr\Log\LogLevel::NOTICE, 'Item ID: ' . $params['id'] . ' updated');  
+
+                    $this->logger->log(\Psr\Log\LogLevel::NOTICE, 'Item ID: ' . $params['id'] . ' updated');
                 } else {
                     $result = ['error' => 'DB error'];
                 }
@@ -89,16 +88,14 @@ class ItemService
                 'error' => 'Bad Request',
                 'errors' => $this->itemValidator->getErrors(),
             ];
-        }        
+        }
         return $result;
     }
 
-    public function destroy($id) 
+    public function destroy(int $id): array
     {
         $result = [];
-        $id = (int)$id;
-
-        if ($this->itemValidator->validateId($id)) {                  
+        if ($this->itemValidator->validateId($id)) {
             if ($this->itemRepository->destroy($id)) {
                 $result = ['success' => 'Deleted'];
             }

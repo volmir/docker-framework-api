@@ -1,8 +1,16 @@
 <?php
+declare(strict_types=1);
 
-use App\Core\Application;
- 
-$loader = require(__DIR__ . '/../vendor/autoload.php');
+use App\Http\Request;
+use App\Http\Router;
 
-$appication = new Application();
-$appication->run();
+/** @var PDO $pdo */
+$pdo = require __DIR__ . '/../src/bootstrap.php';
+
+/** @var array<string, string> $routes */
+$routes = require __DIR__ . '/../config/routes.php';
+
+$request = Request::fromGlobals();
+$router = new Router($routes, $pdo);
+$response = $router->dispatch($request);
+$response->send();

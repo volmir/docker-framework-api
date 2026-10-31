@@ -1,8 +1,7 @@
-FROM nginx:1.21-alpine
+FROM nginx:1.30.6-alpine3.24
 
 COPY nginx.conf  /etc/nginx/
 COPY templates /etc/nginx/templates/
-RUN echo "upstream php-upstream { server php:9000; }" > /etc/nginx/conf.d/upstream.conf
 
 EXPOSE 80
 EXPOSE 443
