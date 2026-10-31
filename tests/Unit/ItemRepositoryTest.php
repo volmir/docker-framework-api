@@ -11,14 +11,6 @@ class ItemRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $config = require(__DIR__ . '/../../config/main.php');
-        
-        define('DB_HOST', $config['db']['test']['host']);
-        define('DB_PORT', $config['db']['test']['port']);
-        define('DB_DBNAME', $config['db']['test']['dbname']);
-        define('DB_USERNAME', $config['db']['test']['username']);
-        define('DB_PASSWORD', $config['db']['test']['password']);
-
         $this->itemRepository = new ItemRepository();
     }
 

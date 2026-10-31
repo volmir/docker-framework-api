@@ -331,9 +331,9 @@ curl -X POST http://localhost:8082/users/create \
 
 ## Configuration
 
-`.env.example` supplies values interpolated by Docker Compose: `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `TIMEZONE`, and `COMPOSE_PROJECT_NAME`. The `MYSQL_*` values configure the MySQL service, `TIMEZONE` is passed to the PHP image build, and `COMPOSE_PROJECT_NAME` names the Compose project. The PHP connection credentials themselves are in `config/main.php`; the `develop` values currently match the example database, user, and password.
+`.env.example` supplies values interpolated by Docker Compose: `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `TIMEZONE`, and `COMPOSE_PROJECT_NAME`. The `MYSQL_*` values configure the MySQL service, `TIMEZONE` is passed to the PHP image build, and `COMPOSE_PROJECT_NAME` names the Compose project. The PHP connection credentials themselves are in `.env`; the `develop` values currently match the example database, user, and password.
 
-`src/bootstrap.php` does not parse `.env`. It loads Composer's autoloader and selects a database configuration from `config/main.php`. On CLI, `APP_ENV` selects the config key when set; otherwise the environment defaults to `develop` (an unknown key also falls back to `develop`). For HTTP, the legacy `Environment::get()` selects `develop` for its listed server addresses and `production` otherwise.
+`src/bootstrap.php` does not parse `.env`. It loads Composer's autoloader and selects a database configuration from `.env`. On CLI, `APP_ENV` selects the config key when set; otherwise the environment defaults to `develop` (an unknown key also falls back to `develop`). For HTTP, the legacy `Environment::get()` selects `develop` for its listed server addresses and `production` otherwise.
 
 ## Docker
 
@@ -375,7 +375,7 @@ The test container runs `composer install` and `composer test`.
 - Migrations do not run inside transactions.
 - Input checks are implemented in individual controllers; there is no shared validation layer for the new routes.
 - The new route map does not invoke the legacy `Auth\Guard`; the demo endpoints have no authentication check.
-- HTTP database configuration depends on `$_SERVER['SERVER_ADDR']` matching the development address list. An unlisted address selects the production configuration in `config/main.php`.
+- HTTP database configuration depends on `$_SERVER['SERVER_ADDR']` matching the development address list. An unlisted address selects the production configuration in `.env`.
 - PHP does not implement CORS or rate limiting. The current Nginx template adds permissive CORS headers; it does not configure rate limiting.
 - The project includes a file logger and PHP-FPM stdout/stderr logging; it does not configure centralized log collection.
 - The MySQL database is stored in a bind-mounted directory. `make fresh` runs `down -v`, but this does not clear that directory; subsequent seed runs may encounter duplicate user emails.
