@@ -1,0 +1,9 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - bin
+        - bin/console # The entrypoint has no .php extension.
+        - public
+        - tests
+    tmpDir: /tmp/phpstan

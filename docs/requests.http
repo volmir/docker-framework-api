@@ -1,0 +1,84 @@
+# REST Client / PhpStorm: set apiKey to a generated plaintext key.
+# Generate with: docker compose exec php bin/console apikey:generate mobile
+# Store the mobile:hash output in .env API_KEY_HASHES and recreate PHP/Nginx.
+# Send X-Api-Key with hyphens; X_API_KEY is not accepted by Nginx.
+# Defaults match .env.example; change baseUrl if APP_PORT differs.
+@baseUrl = http://localhost:8082
+@apiKey = REPLACE_WITH_YOUR_GENERATED_KEY
+@email = requests-client@example.com
+@password = REPLACE_WITH_A_RANDOM_PASSWORD
+@userId = 1
+
+### Public database health: 200, or 503 when DB is unavailable
+GET {{baseUrl}}/health
+
+### Nginx-only health: 200; does not check MySQL
+GET {{baseUrl}}/nginx-health
+
+### Unknown route: 404 JSON
+GET {{baseUrl}}/nope
+
+### Wrong method: 405 and Allow: GET
+POST {{baseUrl}}/health
+Content-Type: application/json
+
+{}
+
+### Protected route without a key: 401 and WWW-Authenticate: ApiKey
+GET {{baseUrl}}/users
+
+### List users: 200
+GET {{baseUrl}}/users?limit=20&offset=0
+X-Api-Key: {{apiKey}}
+X-Request-Id: requests-list-001
+
+### Limit above 100: 422 with details.limit
+GET {{baseUrl}}/users?limit=200&offset=1
+Authorization: Bearer {{apiKey}}
+
+### Show an existing user: set userId after creation or use a seeded ID
+GET {{baseUrl}}/users/show?id={{userId}}
+X-Api-Key: {{apiKey}}
+
+### Invalid ID: 422 with details.id
+GET {{baseUrl}}/users/show?id=abc
+X-Api-Key: {{apiKey}}
+
+### Missing user: normally 404 on the demo database
+GET {{baseUrl}}/users/show?id=999999999
+X-Api-Key: {{apiKey}}
+
+### Create: 201, Location and data; repeat the same email for 409 email_taken
+# Use a new email for another successful creation.
+POST {{baseUrl}}/users
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{"email":"{{email}}","password":"{{password}}"}
+
+### Validation: 422 with email and password details
+POST {{baseUrl}}/users
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{"email":"invalid","password":""}
+
+### Wrong media type: 415
+POST {{baseUrl}}/users
+X-Api-Key: {{apiKey}}
+Content-Type: text/plain
+
+{}
+
+### Invalid JSON: 400 before route middleware
+POST {{baseUrl}}/users
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{"email":
+
+### Nginx CORS preflight: 204, without an API key
+OPTIONS {{baseUrl}}/users
+Origin: https://client.example
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: Content-Type, X-Api-Key

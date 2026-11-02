@@ -1,7 +1,7 @@
-FROM nginx:1.30.6-alpine3.24
+FROM nginx:stable-alpine
 
-COPY nginx.conf  /etc/nginx/
-COPY templates /etc/nginx/templates/
+COPY .docker/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY .docker/nginx/templates/ /etc/nginx/templates/
+COPY public/ /var/www/app/public/
 
 EXPOSE 80
-EXPOSE 443

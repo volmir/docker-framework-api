@@ -1,6 +1,5 @@
 .env
-composer.lock
-/logs/
-/vendor/
-/.docker/mysql/db/
-/.docker/.env.nginx.local
+vendor/
+.phpunit.cache/
+.idea/
+.vscode/

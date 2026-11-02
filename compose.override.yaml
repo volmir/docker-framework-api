@@ -1,0 +1,9 @@
+services:
+  php:
+    build:
+      target: dev
+    volumes:
+      - .:/var/www/app
+  db:
+    ports:
+      - '127.0.0.1:${DB_HOST_PORT:-33306}:3306'

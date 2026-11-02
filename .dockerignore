@@ -1,5 +1,8 @@
 .git
-.docker/mysql/db
-logs
-tests
+.env
+.env.*
+!.env.example
 vendor
+.phpunit.cache
+.idea
+.vscode

@@ -6,9 +6,11 @@ return [
         $pdo->exec("
             CREATE TABLE users (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                email VARCHAR(255) NOT NULL UNIQUE,
+                email VARCHAR(255) NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY users_email_unique (email)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
     },

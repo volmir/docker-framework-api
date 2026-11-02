@@ -2,8 +2,12 @@
 <?php
 declare(strict_types=1);
 
-require __DIR__ . '/../src/bootstrap.php';
-require __DIR__ . '/../src/Console/Console.php';
+require_once __DIR__ . '/../src/Errors.php';
+App\Errors::register();
+require __DIR__ . '/../vendor/autoload.php';
+if (!in_array($argv[1] ?? 'list', ['list', 'help', '--help', '-h'], true)) {
+    App\Config::boot();
+}
 
-$console = new App\Console\Console(__DIR__ . '/../commands');
+$console = new App\Console\Console(__DIR__ . '/../commands', new App\Database\Connection());
 exit($console->run($argv));

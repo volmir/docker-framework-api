@@ -12,25 +12,33 @@ final class Seeder
     {
     }
 
+    /** @return list<string> */
     public function run(?string $name = null): array
     {
-        if ($name !== null) {
-            $file = rtrim($this->dir, '/') . '/' . $name . '.php';
-            if (!is_file($file)) {
-                throw new RuntimeException("Seeder not found: {$name}");
-            }
-            $files = [$file];
-        } else {
-            $files = glob(rtrim($this->dir, '/') . '/*.php') ?: [];
-            sort($files, SORT_STRING);
+        if ($name !== null && !preg_match('/\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\z/', $name)) {
+            throw new RuntimeException('Invalid seeder name');
         }
-
-        $ran = [];
+        $files = $name === null
+            ? (glob(rtrim($this->dir, '/') . '/*.php') ?: [])
+            : [rtrim($this->dir, '/') . '/' . $name . '.php'];
+        sort($files, SORT_STRING);
+        $seeders = [];
         foreach ($files as $file) {
+            if (!preg_match('/\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.php\z/', basename($file))) {
+                throw new RuntimeException('Invalid seeder filename: ' . basename($file));
+            }
+            if (!is_file($file)) {
+                throw new RuntimeException('Seeder not found: ' . basename($file));
+            }
             $seeder = require $file;
-            $seeder['run']($this->pdo);
-            $ran[] = pathinfo($file, PATHINFO_FILENAME);
+            if (!is_array($seeder) || !is_callable($seeder['run'] ?? null)) {
+                throw new RuntimeException('Invalid seeder (callable run required): ' . basename($file));
+            }
+            $seeders[pathinfo($file, PATHINFO_FILENAME)] = $seeder;
         }
-        return $ran;
+        foreach ($seeders as $seeder) {
+            $seeder['run']($this->pdo);
+        }
+        return array_keys($seeders);
     }
 }
