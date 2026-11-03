@@ -22,7 +22,7 @@ final class MiddlewareTest extends TestCase
     {
         $this->environment = $_ENV;
         $_ENV['APP_DEBUG'] = '0';
-        $_ENV['API_KEY_HASHES'] = 'test:' . hash('sha256', 'test-key');
+        $_ENV['API_KEYS'] = 'test:test-key';
     }
 
     protected function tearDown(): void
@@ -148,8 +148,8 @@ PHP);
     public function test_clients_and_rotated_keys_work_in_both_supported_headers(): void
     {
         $keys = ['mobile-old-key' => 'mobile', 'admin-key' => 'admin', 'mobile-new-key' => 'mobile'];
-        $_ENV['API_KEY_HASHES'] = implode(', ', array_map(
-            static fn(string $key, string $client): string => $client . ':' . hash('sha256', $key), array_keys($keys), array_values($keys)));
+        $_ENV['API_KEYS'] = implode(', ', array_map(
+            static fn(string $key, string $client): string => $client . ':' . $key, array_keys($keys), array_values($keys)));
         foreach ($keys as $key => $client) {
             foreach ([['X-Api-Key' => $key], ['Authorization' => 'Bearer ' . $key], ['Authorization' => 'bearer ' . $key]] as $headers) {
                 $request = new Request('GET', '/users', headers: $headers);
@@ -173,20 +173,41 @@ PHP);
             $denied[] = $response->body;
         }
         self::assertCount(1, array_unique($denied));
-        $_ENV['API_KEY_HASHES'] = 'test:' . hash('sha256', '');
+        $_ENV['API_KEYS'] = 'test:';
         self::assertSame(401, (new ApiKeyAuth())->handle(new Request('GET', '/users'), static fn(): Response => Response::noContent())->status);
     }
 
-    public function test_missing_or_empty_hash_configuration_denies_everyone_and_logs_a_warning(): void
+    public function test_api_keys_are_compared_directly_and_case_sensitively(): void
+    {
+        $_ENV['API_KEYS'] = 'mobile:Plaintext_Key-Case';
+        foreach (['Plaintext_Key-Case' => 204, 'plaintext_key-case' => 401, hash('sha256', 'Plaintext_Key-Case') => 401] as $key => $status) {
+            $response = (new ApiKeyAuth())->handle(new Request('GET', '/users', headers: ['X-Api-Key' => $key]), static fn(): Response => Response::noContent());
+            self::assertSame($status, $response->status);
+        }
+    }
+
+    public function test_configured_plaintext_keys_are_redacted_without_request_headers(): void
+    {
+        [$output, $records] = $this->captureStderr(<<<'PHP'
+$_ENV['API_KEYS'] = 'mobile:Configured_Secret-One,admin:Configured_Secret-Two';
+App\Log\Logger::error('Configured_Secret-One Configured_Secret-Two mobile:Configured_Secret-One');
+PHP);
+        self::assertSame('', $output);
+        $logs = json_encode($records, JSON_THROW_ON_ERROR);
+        self::assertStringNotContainsString('Configured_Secret-One', $logs);
+        self::assertStringNotContainsString('Configured_Secret-Two', $logs);
+    }
+
+    public function test_missing_or_empty_key_configuration_denies_everyone_and_logs_a_warning(): void
     {
         [$output, $records] = $this->captureStderr(<<<'PHP'
 $statuses = [];
 foreach (['', ', ,', null] as $config) {
     if ($config === null) {
-        unset($_ENV['API_KEY_HASHES']);
-        putenv('API_KEY_HASHES');
+        unset($_ENV['API_KEYS']);
+        putenv('API_KEYS');
     } else {
-        $_ENV['API_KEY_HASHES'] = $config;
+        $_ENV['API_KEYS'] = $config;
     }
     $response = (new App\Middleware\ApiKeyAuth())->handle(new App\Http\Request('GET', '/users', headers: ['X-Api-Key' => 'private-key']), static fn(): never => throw new LogicException('Core must not run'));
     $statuses[] = $response->status;
@@ -196,18 +217,17 @@ PHP);
         self::assertSame([401, 401, 401], json_decode($output, true));
         self::assertSame(['warning', 'warning', 'warning'], array_column($records, 'level'));
         self::assertStringNotContainsString('private-key', json_encode($records, JSON_THROW_ON_ERROR));
-        self::assertStringNotContainsString(hash('sha256', 'private-key'), json_encode($records, JSON_THROW_ON_ERROR));
     }
 
-    public function test_one_malformed_entry_rejects_the_entire_list_and_logs_no_key_or_hash(): void
+    public function test_one_malformed_entry_rejects_the_entire_list_and_logs_no_key(): void
     {
         [$output, $records] = $this->captureStderr(<<<'PHP'
-$hash = hash('sha256', 'private-valid-key');
+$key = 'private-valid-key';
 $statuses = [];
-foreach ([$hash, 'mobile:', ':'.$hash, 'mobile:'.str_repeat('g',64), 'bad client:'.$hash,
-    'mobile:'.substr($hash,1), 'mobile:'.$hash.',', 'mobile:'.$hash.',broken',
-    str_repeat('a',65).':'.$hash, 'mobile:'.$hash.':extra'] as $config) {
-    $_ENV['API_KEY_HASHES'] = $config;
+foreach ([$key, 'mobile:', ':'.$key, 'mobile:invalid key', 'bad client:'.$key,
+    'mobile:key with spaces', 'mobile:'.$key.',', 'mobile:'.$key.',broken',
+    str_repeat('a',65).':'.$key, 'mobile:'.$key.':extra'] as $config) {
+    $_ENV['API_KEYS'] = $config;
     $response = (new App\Middleware\ApiKeyAuth())->handle(new App\Http\Request('GET', '/users', headers: ['X-Api-Key' => 'private-valid-key']),
         static fn(): never => throw new LogicException('Core must not run'));
     $statuses[] = $response->status;
@@ -217,13 +237,12 @@ PHP);
         self::assertSame(array_fill(0, 10, 401), json_decode($output, true));
         self::assertSame(array_fill(0, 10, 'warning'), array_column($records, 'level'));
         self::assertStringNotContainsString('private-valid-key', json_encode($records, JSON_THROW_ON_ERROR));
-        self::assertStringNotContainsString(hash('sha256', 'private-valid-key'), json_encode($records, JSON_THROW_ON_ERROR));
     }
 
     public function test_global_access_log_records_authenticated_client_on_success_and_failure(): void
     {
         [$output, $records] = $this->captureStderr(<<<'PHP'
-$_ENV['API_KEY_HASHES'] = 'mobile:'.hash('sha256', 'private-mobile-key').',admin:'.hash('sha256', 'private-admin-key');
+$_ENV['API_KEYS'] = 'mobile:private-mobile-key,admin:private-admin-key';
 foreach (['private-mobile-key', 'private-admin-key'] as $key) {
     foreach ([false, true] as $fail) {
         $request = new App\Http\Request('GET', '/users', headers: ['X-Api-Key' => $key]);
@@ -273,13 +292,13 @@ $_ENV['DB_HOST'] = 'private-host.example';
 $_ENV['DB_NAME'] = 'private_database';
 $_ENV['DB_USER'] = 'private_database_user';
 $_ENV['DB_PASSWORD'] = 'private-database-password';
-$_ENV['API_KEY_HASHES'] = 'test:' . strtoupper(hash('sha256', 'private-api-key'));
+$_ENV['API_KEYS'] = 'test:private-api-key';
 $request = new App\Http\Request('POST', '/users', headers: ['X-Api-Key' => 'private-api-key'], body: ['password' => 'private-body-password']);
 $results = [];
 foreach (['0', '1'] as $debug) {
     $_ENV['APP_DEBUG'] = $debug;
     $core = static function (string $argument): never {
-        throw new RuntimeException('Failed private-host.example private_database private_database_user private-database-password private-api-key private-body-password '.hash('sha256', 'private-api-key'));
+        throw new RuntimeException('Failed private-host.example private_database private_database_user private-database-password private-api-key private-body-password '.'private-api-key');
     };
     $response = App\Http\Pipeline::run([new App\Middleware\ErrorHandler(), new App\Middleware\RequestId()], $request,
         static fn(): never => $core('private-trace-argument'));
@@ -288,7 +307,7 @@ foreach (['0', '1'] as $debug) {
 echo json_encode($results, JSON_THROW_ON_ERROR);
 PHP);
         foreach (['private-host.example', 'private_database', 'private_database_user', 'private-database-password',
-            'private-api-key', 'private-body-password', 'private-trace-argument', hash('sha256', 'private-api-key')] as $secret) {
+            'private-api-key', 'private-body-password', 'private-trace-argument', 'private-api-key'] as $secret) {
             self::assertStringNotContainsString($secret, $output . json_encode($records, JSON_THROW_ON_ERROR));
         }
         $results = json_decode($output, true);

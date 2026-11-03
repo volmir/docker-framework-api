@@ -107,7 +107,7 @@ final class DebugTest extends DatabaseTestCase
     public function test_application_routes_report_the_actual_number_of_queries(): void
     {
         $_ENV['APP_DEBUG'] = '1';
-        $_ENV['API_KEY_HASHES'] = 'debug:' . hash('sha256', 'debug-test-key');
+        $_ENV['API_KEYS'] = 'debug:debug-test-key';
         $connection = new Connection();
         $pdo = $connection->pdo();
         $pdo->beginTransaction();

@@ -121,6 +121,16 @@ final class ConfigTest extends TestCase
         Config::boot();
     }
 
+    public function test_legacy_hashed_setting_does_not_replace_api_keys(): void
+    {
+        foreach (Config::REQUIRED as $name) { $_ENV[$name] = $name === 'APP_ENV' ? 'local' : ''; }
+        unset($_ENV['API_KEYS']);
+        $_ENV['API_KEY_HASHES'] = 'mobile:' . str_repeat('a', 64);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Missing environment variables: API_KEYS');
+        Config::boot();
+    }
+
     public function test_boot_accepts_empty_values_in_local_from_both_environment_sources(): void
     {
         foreach (['env', 'process'] as $source) {
@@ -134,7 +144,7 @@ final class ConfigTest extends TestCase
                 }
             }
             Config::boot();
-            self::assertSame('', Config::get('API_KEY_HASHES'));
+            self::assertSame('', Config::get('API_KEYS'));
         }
     }
 
@@ -209,12 +219,12 @@ final class ConfigTest extends TestCase
 
     public function test_production_safety_checks_each_unsafe_setting_and_reports_names_only(): void
     {
-        $safe = ['APP_ENV' => 'production', 'APP_DEBUG' => '0', 'API_KEY_HASHES' => 'test:' . hash('sha256', 'config-test-key'),
+        $safe = ['APP_ENV' => 'production', 'APP_DEBUG' => '0', 'API_KEYS' => 'test:config-test-key',
             'DB_HOST' => 'db', 'DB_PORT' => '3306', 'DB_NAME' => 'app', 'DB_USER' => 'app',
             'DB_PASSWORD' => 'private-app-password', 'DB_ROOT_PASSWORD' => 'private-root-password',
             'CORS_ALLOW_ORIGIN' => 'https://client.example'];
         foreach ([['APP_DEBUG', '1'], ['APP_DEBUG', 'true'], ['APP_DEBUG', 'invalid-debug'],
-            ['API_KEY_HASHES', ''], ['API_KEY_HASHES', ', ,'], ['API_KEY_HASHES', hash('sha256', 'legacy-key')], ['API_KEY_HASHES', 'mobile:not-a-hash'], ['DB_PASSWORD', 'change-me'],
+            ['API_KEYS', ''], ['API_KEYS', ', ,'], ['API_KEYS', 'legacy-key'], ['API_KEYS', 'mobile:invalid key'], ['DB_PASSWORD', 'change-me'],
             ['DB_ROOT_PASSWORD', 'change-me-too'], ['DB_PASSWORD', 'change-me-too'],
             ['DB_ROOT_PASSWORD', 'change-me'], ['DB_PASSWORD', ''], ['DB_ROOT_PASSWORD', ''],
             ['CORS_ALLOW_ORIGIN', '*']] as [$name, $value]) {
@@ -236,13 +246,13 @@ final class ConfigTest extends TestCase
 
     public function test_production_reports_all_problems_and_other_modes_skip_checks(): void
     {
-        $_ENV = array_replace($_ENV, ['APP_ENV' => 'production', 'APP_DEBUG' => '1', 'API_KEY_HASHES' => '',
+        $_ENV = array_replace($_ENV, ['APP_ENV' => 'production', 'APP_DEBUG' => '1', 'API_KEYS' => '',
             'DB_PASSWORD' => 'change-me', 'DB_ROOT_PASSWORD' => 'change-me-too', 'CORS_ALLOW_ORIGIN' => '*']);
         try {
             Config::assertSafe();
             self::fail('Expected unsafe configuration');
         } catch (RuntimeException $error) {
-            self::assertSame('Unsafe production configuration: APP_DEBUG, API_KEY_HASHES, DB_PASSWORD, DB_ROOT_PASSWORD, CORS_ALLOW_ORIGIN', $error->getMessage());
+            self::assertSame('Unsafe production configuration: APP_DEBUG, API_KEYS, DB_PASSWORD, DB_ROOT_PASSWORD, CORS_ALLOW_ORIGIN', $error->getMessage());
         }
         foreach (['local', 'test'] as $mode) {
             $_ENV['APP_ENV'] = $mode;
@@ -251,13 +261,13 @@ final class ConfigTest extends TestCase
         }
     }
 
-    public function test_api_key_entries_preserve_clients_rotation_order_and_normalize_hashes(): void
+    public function test_api_key_entries_preserve_clients_rotation_order_and_key_case(): void
     {
-        $mobile = hash('sha256', 'mobile-old');
-        $admin = hash('sha256', 'admin-key');
-        $rotated = hash('sha256', 'mobile-new');
-        $_ENV['API_KEY_HASHES'] = ' mobile:' . $mobile . ', admin:' . strtoupper($admin) . ',mobile:' . $rotated . ' ';
-        self::assertSame([['mobile', $mobile], ['admin', $admin], ['mobile', $rotated]], Config::apiKeyHashes());
+        $mobile = 'mobile-old';
+        $admin = 'admin-key';
+        $rotated = 'mobile-new';
+        $_ENV['API_KEYS'] = ' mobile:' . $mobile . ', admin:' . strtoupper($admin) . ',mobile:' . $rotated . ' ';
+        self::assertSame([['mobile', $mobile], ['admin', strtoupper($admin)], ['mobile', $rotated]], Config::apiKeys());
     }
 
     public function test_all_uses_the_same_precedence_as_get(): void

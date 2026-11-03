@@ -14,18 +14,17 @@ final class ApiKeyAuth implements Middleware
 {
     public function handle(Request $request, callable $next): Response
     {
-        try { $hashes = Config::apiKeyHashes(); } catch (RuntimeException) {
-            $hashes = [];
-            Logger::warning('API_KEY_HASHES is empty or invalid; denying API key authentication');
+        try { $keys = Config::apiKeys(); } catch (RuntimeException) {
+            $keys = [];
+            Logger::warning('API_KEYS is empty or invalid; denying API key authentication');
         }
         $key = $request->header('X-Api-Key') ?? '';
         if ($key === '' && preg_match('/\ABearer[ \t]+(\S+)\z/i', trim($request->header('Authorization') ?? ''), $match)) {
             $key = $match[1];
         }
-        $digest = hash('sha256', $key);
         $client = null;
-        foreach ($hashes as [$name, $expected]) {
-            $matched = hash_equals($expected, $digest);
+        foreach ($keys as [$name, $expected]) {
+            $matched = hash_equals($expected, $key);
             if ($matched && $client === null) { $client = $name; }
         }
         if ($key === '' || $client === null) {

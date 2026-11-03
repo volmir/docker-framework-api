@@ -39,7 +39,7 @@
        <env name="DB_USER" value="test" force="true" />
        <env name="DB_PASSWORD" value="test-password" force="true" />
        <env name="DB_ROOT_PASSWORD" value="test-root-password" force="true" />
-       <env name="API_KEY_HASHES" value="" force="true" />
+       <env name="API_KEYS" value="" force="true" />
        <env name="CORS_ALLOW_ORIGIN" value="*" force="true" />
     </php>
 </phpunit>

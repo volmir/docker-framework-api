@@ -20,12 +20,11 @@ final class Redactor
         foreach (Config::all() as $name => $value) {
             if (preg_match('/\ADB_|PASSWORD|PASSWD|SECRET|TOKEN|API_KEY/i', $name)) {
                 $remember($name, $value);
-                if ($name === 'API_KEY_HASHES') {
-                    foreach (explode(',', (string) $value) as $hash) {
-                        $remember($name, trim($hash));
-                        $digest = trim(explode(':', $hash, 2)[1] ?? '');
-                        $remember($name, $digest);
-                        $remember($name, strtolower($digest));
+                if ($name === 'API_KEYS') {
+                    foreach (explode(',', (string) $value) as $entry) {
+                        $remember($name, trim($entry));
+                        $key = explode(':', trim($entry), 2)[1] ?? '';
+                        $remember($name, $key);
                     }
                 }
             }

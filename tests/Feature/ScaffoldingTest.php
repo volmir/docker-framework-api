@@ -24,7 +24,7 @@ final class ScaffoldingTest extends TestCase
         }
         $this->environment = $_ENV;
         $_ENV = array_replace($_ENV, ['APP_ENV' => 'test', 'DB_HOST' => '127.0.0.1', 'DB_PORT' => '1',
-            'API_KEY_HASHES' => 'scaffolding:' . hash('sha256', 'scaffolding-test-key')]);
+            'API_KEYS' => 'scaffolding:scaffolding-test-key']);
     }
 
     protected function tearDown(): void

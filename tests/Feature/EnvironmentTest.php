@@ -18,13 +18,13 @@ final class EnvironmentTest extends TestCase
 
     public function test_production_defaults_stop_every_cli_entry_before_execution(): void
     {
-        $settings = ['APP_ENV' => 'production', 'APP_DEBUG' => '1', 'API_KEY_HASHES' => '',
+        $settings = ['APP_ENV' => 'production', 'APP_DEBUG' => '1', 'API_KEYS' => '',
             'DB_PASSWORD' => 'change-me', 'DB_ROOT_PASSWORD' => 'change-me-too', 'CORS_ALLOW_ORIGIN' => '*'];
         foreach (['env:check', 'apikey:generate'] as $command) {
             [$status, $stdout, $stderr] = $this->console($command, $settings);
             self::assertSame(1, $status);
             self::assertSame('', $stdout);
-            self::assertStringContainsString('Unsafe production configuration: APP_DEBUG, API_KEY_HASHES, DB_PASSWORD, DB_ROOT_PASSWORD, CORS_ALLOW_ORIGIN', $stderr);
+            self::assertStringContainsString('Unsafe production configuration: APP_DEBUG, API_KEYS, DB_PASSWORD, DB_ROOT_PASSWORD, CORS_ALLOW_ORIGIN', $stderr);
             self::assertStringNotContainsString('change-me', $stderr);
             self::assertStringNotContainsString('"trace"', $stderr);
             self::assertStringNotContainsString('Error formatter unavailable', $stderr);
@@ -81,7 +81,7 @@ final class EnvironmentTest extends TestCase
     {
         foreach (['local', 'test'] as $mode) {
             [$status, $stdout, $stderr] = $this->console('env:check', ['APP_ENV' => $mode, 'APP_DEBUG' => '1',
-                'API_KEY_HASHES' => '', 'DB_PASSWORD' => 'change-me', 'DB_ROOT_PASSWORD' => 'change-me-too', 'CORS_ALLOW_ORIGIN' => '*']);
+                'API_KEYS' => '', 'DB_PASSWORD' => 'change-me', 'DB_ROOT_PASSWORD' => 'change-me-too', 'CORS_ALLOW_ORIGIN' => '*']);
             self::assertSame(0, $status, $stderr);
             self::assertSame("Environment {$mode} is safe.\n", $stdout);
         }
@@ -108,7 +108,7 @@ final class EnvironmentTest extends TestCase
      * @return array{int, string, string} */
     private function process(array $command, array $settings): array
     {
-        $environment = array_replace(Config::all(), self::SAFE, ['API_KEY_HASHES' => 'test:' . hash('sha256', 'environment-test-key')], $settings);
+        $environment = array_replace(Config::all(), self::SAFE, ['API_KEYS' => 'test:environment-test-key'], $settings);
         $environment = array_filter($environment, static fn(mixed $value): bool => $value !== null);
         // proc_open drops empty values from env_vars; env preserves NAME= for the child.
         $empty = array_map(static fn(string $key): string => $key . '=', array_keys(array_filter($environment, static fn(mixed $value): bool => $value === '')));

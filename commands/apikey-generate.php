@@ -7,7 +7,7 @@ use App\Config;
 /** @var array{name:string, description:string, execute:callable(list<string>, Connection):int} $command */
 $command = [
     'name' => 'apikey:generate',
-    'description' => 'Generate an API key and a client:hash entry: apikey:generate <client>',
+    'description' => 'Generate a plaintext client:key entry: apikey:generate <client>',
     'execute' => static function (array $args, Connection $connection): int {
         /** @var list<string> $args */
         $client = $args[0] ?? '';
@@ -15,8 +15,7 @@ $command = [
             throw new RuntimeException('Usage: apikey:generate <client> (1-64 ASCII letters/digits/_/-, starting with a letter or digit)');
         }
         $key = bin2hex(random_bytes(32));
-        echo "API key (shown once): {$key}\n";
-        echo $client . ':' . hash('sha256', $key) . PHP_EOL;
+        echo $client . ':' . $key . PHP_EOL;
         return 0;
     },
 ];

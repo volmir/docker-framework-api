@@ -125,7 +125,7 @@ PHP);
         new Console($this->commandsDir, $this->connection);
     }
 
-    public function test_api_key_generator_prints_a_key_once_and_its_matching_hash(): void
+    public function test_api_key_generator_prints_a_plaintext_entry_usable_for_authentication(): void
     {
         $console = new Console(__DIR__ . '/../../commands', $this->connection);
         ob_start();
@@ -138,11 +138,17 @@ PHP);
         }
 
         self::assertSame(0, $code);
-        if (preg_match('/\AAPI key \(shown once\): ([a-f0-9]{64})\nmobile:([a-f0-9]{64})\n\z/', $output, $matches) !== 1) {
+        if (preg_match('/\Amobile:([a-f0-9]{64})\n\z/', $output, $matches) !== 1) {
             self::fail('Invalid API key generator output');
         }
-        self::assertSame(hash('sha256', $matches[1]), $matches[2]);
+        self::assertSame('mobile:' . $matches[1] . PHP_EOL, $output);
         self::assertSame(1, substr_count($output, $matches[1]));
+        $environment = $_ENV;
+        try {
+            $_ENV['API_KEYS'] = trim($output);
+            $response = (new \App\Middleware\ApiKeyAuth())->handle(new \App\Http\Request('GET', '/users', headers: ['X-Api-Key' => $matches[1]]), static fn(): \App\Http\Response => \App\Http\Response::noContent());
+            self::assertSame(204, $response->status);
+        } finally { $_ENV = $environment; }
     }
 
     public function test_api_key_generator_rejects_missing_invalid_or_extra_client_arguments(): void

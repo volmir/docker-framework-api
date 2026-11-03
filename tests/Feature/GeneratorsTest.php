@@ -171,7 +171,7 @@ final class GeneratorsTest extends TestCase
 
     public function test_production_and_non_writable_directories_have_actionable_errors(): void
     {
-        $production = ['APP_ENV' => 'production', 'APP_DEBUG' => '0', 'API_KEY_HASHES' => 'test:' . hash('sha256', 'generator-test'),
+        $production = ['APP_ENV' => 'production', 'APP_DEBUG' => '0', 'API_KEYS' => 'test:generator-test',
             'DB_PASSWORD' => 'private-test-password', 'DB_ROOT_PASSWORD' => 'private-root-password', 'CORS_ALLOW_ORIGIN' => 'https://example.com'];
         foreach ([['make:migration', 'create_posts_table', 'database/migrations', 'make migration name='],
             ['make:command', 'report:users', 'commands', 'make command name=']] as [$command, $name, $path, $hint]) {

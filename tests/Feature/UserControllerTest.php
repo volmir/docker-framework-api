@@ -23,7 +23,7 @@ final class UserControllerTest extends DatabaseTestCase
     {
         $this->environment = $_ENV;
         parent::setUp();
-        $_ENV['API_KEY_HASHES'] = 'test:' . hash('sha256', self::KEY);
+        $_ENV['API_KEYS'] = 'test:' . self::KEY;
         $_ENV['APP_DEBUG'] = '0';
         $this->router = new Router(require __DIR__ . '/../../src/routes.php', $this->connection);
     }

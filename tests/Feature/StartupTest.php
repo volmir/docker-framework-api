@@ -31,7 +31,7 @@ final class StartupTest extends TestCase
             'APP_ENV' => $mode, 'APP_DEBUG' => $debug,
             'DB_PORT' => '1', 'DB_NAME' => 'startup-private-database', 'DB_USER' => 'startup-private-user',
             'DB_PASSWORD' => 'startup-private-password', 'DB_ROOT_PASSWORD' => 'startup-private-root',
-            'API_KEY_HASHES' => 'startup:' . hash('sha256', 'startup-key'),
+            'API_KEYS' => 'startup:startup-key',
             'CORS_ALLOW_ORIGIN' => 'https://client.example',
         ]);
         unset($environment['DB_HOST']);

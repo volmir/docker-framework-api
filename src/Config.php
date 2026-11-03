@@ -9,7 +9,7 @@ final class Config
 {
     public const array REQUIRED = [
         'APP_ENV', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD',
-        'API_KEY_HASHES', 'CORS_ALLOW_ORIGIN',
+        'API_KEYS', 'CORS_ALLOW_ORIGIN',
     ];
     public const string API_CLIENT_PATTERN = '/\A[A-Za-z0-9][A-Za-z0-9_-]{0,63}\z/';
 
@@ -20,15 +20,15 @@ final class Config
     }
 
     /** @return list<array{0:string, 1:string}> */
-    public static function apiKeyHashes(): array
+    public static function apiKeys(): array
     {
         $keys = [];
-        foreach (explode(',', self::get('API_KEY_HASHES', '')) as $entry) {
-            [$client, $hash] = array_pad(explode(':', trim($entry), 2), 2, '');
-            if (!preg_match(self::API_CLIENT_PATTERN, $client) || !preg_match('/\A[0-9a-fA-F]{64}\z/', $hash)) {
-                throw new RuntimeException('Invalid environment variable: API_KEY_HASHES');
+        foreach (explode(',', self::get('API_KEYS', '')) as $entry) {
+            [$client, $key] = array_pad(explode(':', trim($entry), 2), 2, '');
+            if (!preg_match(self::API_CLIENT_PATTERN, $client) || !preg_match('/\A[A-Za-z0-9_-]+\z/', $key)) {
+                throw new RuntimeException('Invalid environment variable: API_KEYS');
             }
-            $keys[] = [$client, strtolower($hash)];
+            $keys[] = [$client, $key];
         }
         return $keys;
     }
@@ -69,7 +69,7 @@ final class Config
         } catch (RuntimeException) {
             $problems[] = 'APP_DEBUG';
         }
-        try { self::apiKeyHashes(); } catch (RuntimeException) { $problems[] = 'API_KEY_HASHES'; }
+        try { self::apiKeys(); } catch (RuntimeException) { $problems[] = 'API_KEYS'; }
         foreach (['DB_PASSWORD', 'DB_ROOT_PASSWORD'] as $key) {
             if (in_array(self::get($key, ''), ['', 'change-me', 'change-me-too'], true)) { $problems[] = $key; }
         }
