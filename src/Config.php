@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App;
@@ -65,15 +66,25 @@ final class Config
         }
         $problems = [];
         try {
-            if (self::bool('APP_DEBUG')) { $problems[] = 'APP_DEBUG'; }
+            if (self::bool('APP_DEBUG')) {
+                $problems[] = 'APP_DEBUG';
+            }
         } catch (RuntimeException) {
             $problems[] = 'APP_DEBUG';
         }
-        try { self::apiKeys(); } catch (RuntimeException) { $problems[] = 'API_KEYS'; }
-        foreach (['DB_PASSWORD', 'DB_ROOT_PASSWORD'] as $key) {
-            if (in_array(self::get($key, ''), ['', 'change-me', 'change-me-too'], true)) { $problems[] = $key; }
+        try {
+            self::apiKeys();
+        } catch (RuntimeException) {
+            $problems[] = 'API_KEYS';
         }
-        if (trim(self::get('CORS_ALLOW_ORIGIN', '*')) === '*') { $problems[] = 'CORS_ALLOW_ORIGIN'; }
+        foreach (['DB_PASSWORD', 'DB_ROOT_PASSWORD'] as $key) {
+            if (in_array(self::get($key, ''), ['', 'change-me', 'change-me-too'], true)) {
+                $problems[] = $key;
+            }
+        }
+        if (trim(self::get('CORS_ALLOW_ORIGIN', '*')) === '*') {
+            $problems[] = 'CORS_ALLOW_ORIGIN';
+        }
         if ($problems !== []) {
             throw new RuntimeException('Unsafe production configuration: ' . implode(', ', $problems));
         }

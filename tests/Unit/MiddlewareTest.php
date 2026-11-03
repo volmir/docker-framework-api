@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Unit;
@@ -149,7 +150,10 @@ PHP);
     {
         $keys = ['mobile-old-key' => 'mobile', 'admin-key' => 'admin', 'mobile-new-key' => 'mobile'];
         $_ENV['API_KEYS'] = implode(', ', array_map(
-            static fn(string $key, string $client): string => $client . ':' . $key, array_keys($keys), array_values($keys)));
+            static fn(string $key, string $client): string => $client . ':' . $key,
+            array_keys($keys),
+            array_values($keys),
+        ));
         foreach ($keys as $key => $client) {
             foreach ([['X-Api-Key' => $key], ['Authorization' => 'Bearer ' . $key], ['Authorization' => 'bearer ' . $key]] as $headers) {
                 $request = new Request('GET', '/users', headers: $headers);
@@ -328,8 +332,11 @@ PHP);
 
     public function test_returned_errors_also_receive_a_request_id_in_the_body(): void
     {
-        $response = Pipeline::run([new RequestId(), new ApiKeyAuth()], new Request('GET', '/users'),
-            static fn(): never => throw new \LogicException('Core must not run'));
+        $response = Pipeline::run(
+            [new RequestId(), new ApiKeyAuth()],
+            new Request('GET', '/users'),
+            static fn(): never => throw new \LogicException('Core must not run'),
+        );
         self::assertSame(401, $response->status);
         self::assertSame($response->headers['X-Request-Id'], json_decode($response->body, true)['error']['request_id']);
     }

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -25,7 +26,9 @@ final class DebugTest extends DatabaseTestCase
 
     protected function tearDown(): void
     {
-        try { parent::tearDown(); } finally {
+        try {
+            parent::tearDown();
+        } finally {
             $_ENV = $this->environment;
             QueryLog::$queries = [];
         }
@@ -101,7 +104,9 @@ final class DebugTest extends DatabaseTestCase
             $log = json_encode(QueryLog::$queries, JSON_THROW_ON_ERROR);
             self::assertStringNotContainsString($email, $log);
             self::assertStringNotContainsString('trace-secret', $log);
-        } finally { $connection->pdo()->rollBack(); }
+        } finally {
+            $connection->pdo()->rollBack();
+        }
     }
 
     public function test_application_routes_report_the_actual_number_of_queries(): void
@@ -117,8 +122,12 @@ final class DebugTest extends DatabaseTestCase
                 [new Request('GET', '/health'), 200, '1'],
                 [new Request('GET', '/users'), 401, '0'],
                 [new Request('GET', '/users', headers: ['X-Api-Key' => 'debug-test-key']), 200, '1'],
-                [new Request('POST', '/users', headers: ['X-Api-Key' => 'debug-test-key', 'Content-Type' => 'application/json'],
-                    body: ['email' => 'debug-example@example.com', 'password' => bin2hex(random_bytes(16))]), 201, '2'],
+                [new Request(
+                    'POST',
+                    '/users',
+                    headers: ['X-Api-Key' => 'debug-test-key', 'Content-Type' => 'application/json'],
+                    body: ['email' => 'debug-example@example.com', 'password' => bin2hex(random_bytes(16))],
+                ), 201, '2'],
             ];
             foreach ($requests as [$request, $status, $count]) {
                 $response = $this->runDebug($router->handle(...), $request);
@@ -126,7 +135,9 @@ final class DebugTest extends DatabaseTestCase
                 self::assertSame($count, $response->headers['X-Debug-Queries']);
                 self::assertSame((int) $count, count(QueryLog::$queries));
             }
-        } finally { $pdo->rollBack(); }
+        } finally {
+            $pdo->rollBack();
+        }
     }
 
     public function test_failed_queries_are_counted_and_error_responses_keep_debug_headers(): void

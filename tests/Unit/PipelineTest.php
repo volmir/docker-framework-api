@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Unit;
@@ -39,9 +40,7 @@ final class PipelineTest extends TestCase
 
 final class TraceMiddleware implements Middleware
 {
-    public function __construct(private string $name)
-    {
-    }
+    public function __construct(private string $name) {}
 
     public function handle(Request $request, callable $next): Response
     {

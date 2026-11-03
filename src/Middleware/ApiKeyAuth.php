@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Middleware;
@@ -14,7 +15,9 @@ final class ApiKeyAuth implements Middleware
 {
     public function handle(Request $request, callable $next): Response
     {
-        try { $keys = Config::apiKeys(); } catch (RuntimeException) {
+        try {
+            $keys = Config::apiKeys();
+        } catch (RuntimeException) {
             $keys = [];
             Logger::warning('API_KEYS is empty or invalid; denying API key authentication');
         }
@@ -25,13 +28,17 @@ final class ApiKeyAuth implements Middleware
         $client = null;
         foreach ($keys as [$name, $expected]) {
             $matched = hash_equals($expected, $key);
-            if ($matched && $client === null) { $client = $name; }
+            if ($matched && $client === null) {
+                $client = $name;
+            }
         }
         if ($key === '' || $client === null) {
             return Response::error(401, 'unauthorized', 'Valid API key required')->withHeader('WWW-Authenticate', 'ApiKey');
         }
         $context = $request->attributes['access_log'] ?? null;
-        if ($context !== null) { $context->client = $client; }
+        if ($context !== null) {
+            $context->client = $client;
+        }
         return $next($request->withAttribute('client', $client));
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -176,9 +177,7 @@ final class RouterTest extends DatabaseTestCase
 
 final class RouterTestController
 {
-    public function __construct(private Connection $connection)
-    {
-    }
+    public function __construct(private Connection $connection) {}
 
     public function respond(Request $request): Response
     {
@@ -228,9 +227,7 @@ final class UnreachableController
 
 final class FailingController
 {
-    public function __construct(Connection $_connection)
-    {
-    }
+    public function __construct(Connection $_connection) {}
 
     public function respond(Request $request): Response
     {
@@ -240,9 +237,7 @@ final class FailingController
 
 final class HttpFailureController
 {
-    public function __construct(Connection $_connection)
-    {
-    }
+    public function __construct(Connection $_connection) {}
 
     public function respond(Request $request): Response
     {

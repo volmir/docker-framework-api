@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -166,8 +167,11 @@ final class UserControllerTest extends DatabaseTestCase
     private function request(string $method, string $path, array $query = [], array $body = [], ?array $headers = null): Response
     {
         $headers ??= ['X-Api-Key' => self::KEY, 'Content-Type' => 'application/json'];
-        $response = Pipeline::run([new ErrorHandler(), new RequestId(), new AccessLog()],
-            new Request($method, $path, $query, $headers, $body), $this->router->handle(...));
+        $response = Pipeline::run(
+            [new ErrorHandler(), new RequestId(), new AccessLog()],
+            new Request($method, $path, $query, $headers, $body),
+            $this->router->handle(...),
+        );
         self::assertSame('application/json; charset=utf-8', $response->headers['Content-Type']);
         self::assertMatchesRegularExpression('/\A[a-f0-9]{16}\z/', $response->headers['X-Request-Id']);
         return $response;

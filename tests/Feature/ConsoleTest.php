@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -35,7 +36,9 @@ PHP);
 
     protected function tearDown(): void
     {
-        foreach (glob($this->commandsDir . '/*') ?: [] as $file) unlink($file);
+        foreach (glob($this->commandsDir . '/*') ?: [] as $file) {
+            unlink($file);
+        }
         rmdir($this->commandsDir);
     }
 
@@ -160,7 +163,9 @@ PHP);
             $_ENV['API_KEYS'] = trim($output);
             $response = (new \App\Middleware\ApiKeyAuth())->handle(new \App\Http\Request('GET', '/users', headers: ['X-Api-Key' => $matches[1]]), static fn(): \App\Http\Response => \App\Http\Response::noContent());
             self::assertSame(204, $response->status);
-        } finally { $_ENV = $environment; }
+        } finally {
+            $_ENV = $environment;
+        }
     }
 
     public function test_api_key_generator_rejects_missing_invalid_or_extra_client_arguments(): void

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Http;
@@ -10,8 +11,7 @@ final class Response
         public string $body = '',
         public int $status = 200,
         public array $headers = [],
-    ) {
-    }
+    ) {}
 
     public static function json(mixed $data, int $status = 200): self
     {

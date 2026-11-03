@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -50,7 +51,9 @@ final class RoutesCommandTest extends TestCase
                 foreach (['0', '1'] as $debug) {
                     $_ENV['APP_DEBUG'] = $debug;
                     $expected = [ErrorHandler::class, RequestId::class, AccessLog::class];
-                    if ($env !== 'production' && $debug === '1') { array_unshift($expected, Debug::class); }
+                    if ($env !== 'production' && $debug === '1') {
+                        array_unshift($expected, Debug::class);
+                    }
                     self::assertSame($expected, require __DIR__ . '/../../src/middleware.php');
                 }
             }
@@ -92,7 +95,9 @@ PHP);
             foreach (['commands/routes.php', 'src/routes.php', 'src/middleware.php'] as $file) {
                 unlink($directory . '/' . $file);
             }
-            foreach (['src', 'commands', ''] as $path) { rmdir($directory . '/' . $path); }
+            foreach (['src', 'commands', ''] as $path) {
+                rmdir($directory . '/' . $path);
+            }
         }
     }
 }

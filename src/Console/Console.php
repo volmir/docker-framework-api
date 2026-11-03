@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Console;
@@ -68,13 +69,19 @@ final class Console
     /** @return list<string> Literal keys in the returned route array, before PHP overwrites duplicates. */
     public static function routeKeys(string $source): array
     {
-        $tokens = array_values(array_filter(PhpToken::tokenize($source),
-            static fn(PhpToken $token): bool => !$token->is([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])));
+        $tokens = array_values(array_filter(
+            PhpToken::tokenize($source),
+            static fn(PhpToken $token): bool => !$token->is([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT]),
+        ));
         $keys = [];
         $depth = 0;
         foreach ($tokens as $index => $token) {
-            if ($token->text === '[') { ++$depth; }
-            if ($token->text === ']') { --$depth; }
+            if ($token->text === '[') {
+                ++$depth;
+            }
+            if ($token->text === ']') {
+                --$depth;
+            }
             if ($depth === 1 && $token->is(T_CONSTANT_ENCAPSED_STRING) && ($tokens[$index + 1] ?? null)?->is(T_DOUBLE_ARROW)) {
                 $value = substr($token->text, 1, -1);
                 $keys[] = $token->text[0] === "'" ? str_replace(["\\\\", "\\'"], ["\\", "'"], $value) : stripcslashes($value);
@@ -117,7 +124,9 @@ final class Console
                     $problems[] = "{$key}: controller method does not exist: {$class}@{$method}";
                 }
                 $problems = array_merge($problems, $middlewareErrors($layers, $key));
-                if (($counts[$key] ?? 0) > 1) { $problems[] = "{$key}: duplicate route key"; }
+                if (($counts[$key] ?? 0) > 1) {
+                    $problems[] = "{$key}: duplicate route key";
+                }
             }
             [$verb, $path] = explode(' ', $key, 2);
             $rows[] = [($problems !== [] || $globalErrors !== [] ? '! ' : '') . $verb, $path,
@@ -126,11 +135,15 @@ final class Console
         }
         $widths = [0, 0, 0, 0];
         foreach ($rows as $row) {
-            foreach ($row as $column => $cell) { $widths[$column] = max($widths[$column], mb_strlen($cell, 'UTF-8')); }
+            foreach ($row as $column => $cell) {
+                $widths[$column] = max($widths[$column], mb_strlen($cell, 'UTF-8'));
+            }
         }
         $lines = ['Global: ' . implode(' → ', array_map($short, $global))];
         foreach ($rows as $row) {
-            foreach ($row as $column => &$cell) { $cell .= str_repeat(' ', $widths[$column] - mb_strlen($cell, 'UTF-8')); }
+            foreach ($row as $column => &$cell) {
+                $cell .= str_repeat(' ', $widths[$column] - mb_strlen($cell, 'UTF-8'));
+            }
             unset($cell);
             $lines[] = rtrim(implode(' | ', $row));
         }

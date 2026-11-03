@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -35,8 +36,12 @@ final class StartupTest extends TestCase
             'CORS_ALLOW_ORIGIN' => 'https://client.example',
         ]);
         unset($environment['DB_HOST']);
-        $process = proc_open([PHP_BINARY, '-S', $address, dirname(__DIR__, 2) . '/public/index.php'],
-            [0 => ['file', '/dev/null', 'r'], 1 => ['file', $log, 'a'], 2 => ['file', $log, 'a']], $pipes, env_vars: $environment);
+        $process = proc_open(
+            [PHP_BINARY, '-S', $address, dirname(__DIR__, 2) . '/public/index.php'],
+            [0 => ['file', '/dev/null', 'r'], 1 => ['file', $log, 'a'], 2 => ['file', $log, 'a']],
+            $pipes,
+            env_vars: $environment,
+        );
         self::assertIsResource($process);
         try {
             $ready = false;

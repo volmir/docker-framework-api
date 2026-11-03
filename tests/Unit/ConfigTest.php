@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Unit;
@@ -123,7 +124,9 @@ final class ConfigTest extends TestCase
 
     public function test_legacy_hashed_setting_does_not_replace_api_keys(): void
     {
-        foreach (Config::REQUIRED as $name) { $_ENV[$name] = $name === 'APP_ENV' ? 'local' : ''; }
+        foreach (Config::REQUIRED as $name) {
+            $_ENV[$name] = $name === 'APP_ENV' ? 'local' : '';
+        }
         unset($_ENV['API_KEYS']);
         $_ENV['API_KEY_HASHES'] = 'mobile:' . str_repeat('a', 64);
         $this->expectException(RuntimeException::class);

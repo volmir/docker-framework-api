@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Users;
@@ -16,7 +17,9 @@ final class CommandsTest extends DatabaseTestCase
         parent::tearDown();
         // CLI children commit on separate connections; remove only this test's users.
         $delete = $this->pdo->prepare('DELETE FROM users WHERE email = ?');
-        foreach ($this->emails as $email) { $delete->execute([$email]); }
+        foreach ($this->emails as $email) {
+            $delete->execute([$email]);
+        }
     }
 
     public function test_create_reads_password_from_stdin_and_duplicate_returns_one_without_disclosure(): void
@@ -69,7 +72,9 @@ final class CommandsTest extends DatabaseTestCase
             self::assertSame(0, $code, $error);
             $users = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
             self::assertCount(count($args) === 1 ? 2 : 1, $users);
-            foreach ($users as $user) { self::assertSame(['id', 'email', 'created_at'], array_keys($user)); }
+            foreach ($users as $user) {
+                self::assertSame(['id', 'email', 'created_at'], array_keys($user));
+            }
             self::assertStringNotContainsString('password', $output);
         }
         foreach (['--limit=', '--limit=0', '--limit=101', '--limit=abc', '--offset=1', '10'] as $arg) {
@@ -95,13 +100,21 @@ final class CommandsTest extends DatabaseTestCase
         $environment = array_map(static fn(mixed $value): string => (string) $value, Config::all());
         $environment['APP_DEBUG'] = '0';
         $empty = array_map(static fn(string $key): string => $key . '=', array_keys(array_filter($environment, static fn(string $value): bool => $value === '')));
-        $process = proc_open(['env', ...$empty, PHP_BINARY, dirname(__DIR__, 2) . '/bin/console', ...$args],
-            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, env_vars: $environment);
+        $process = proc_open(
+            ['env', ...$empty, PHP_BINARY, dirname(__DIR__, 2) . '/bin/console', ...$args],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            env_vars: $environment,
+        );
         self::assertIsResource($process);
-        fwrite($pipes[0], $input); fclose($pipes[0]);
-        $output = stream_get_contents($pipes[1]); $error = stream_get_contents($pipes[2]);
-        self::assertIsString($output); self::assertIsString($error);
-        fclose($pipes[1]); fclose($pipes[2]);
+        fwrite($pipes[0], $input);
+        fclose($pipes[0]);
+        $output = stream_get_contents($pipes[1]);
+        $error = stream_get_contents($pipes[2]);
+        self::assertIsString($output);
+        self::assertIsString($error);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
         return [proc_close($process), $output, $error];
     }
 }

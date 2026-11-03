@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Unit;
@@ -36,8 +37,11 @@ final class RoutesTest extends TestCase
 
     public function test_invalid_global_middleware_are_reported_and_mark_every_route(): void
     {
-        $result = Console::routesTable(['GET /health' => [HealthController::class, 'index']],
-            ['MissingGlobal', HealthController::class], true);
+        $result = Console::routesTable(
+            ['GET /health' => [HealthController::class, 'index']],
+            ['MissingGlobal', HealthController::class],
+            true,
+        );
 
         self::assertSame([
             'Global: middleware class does not exist: MissingGlobal',

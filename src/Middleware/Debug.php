@@ -1,14 +1,20 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Middleware;
+
 use App\Config;
 use App\Database\QueryLog;
 use App\Http\{Middleware, Request, Response};
+
 final class Debug implements Middleware
 {
     public function handle(Request $request, callable $next): Response
     {
-        if (!Config::isDebug()) { return $next($request); }
+        if (!Config::isDebug()) {
+            return $next($request);
+        }
         QueryLog::$queries = [];
         $start = hrtime(true);
         $response = $next($request);

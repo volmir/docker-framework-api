@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -17,12 +18,16 @@ final class GeneratorsTest extends TestCase
     protected function setUp(): void
     {
         $this->directory = sys_get_temp_dir() . '/generators-' . bin2hex(random_bytes(6));
-        foreach (['commands', 'database/migrations', 'bin'] as $path) { mkdir($this->directory . '/' . $path, 0777, true); }
+        foreach (['commands', 'database/migrations', 'bin'] as $path) {
+            mkdir($this->directory . '/' . $path, 0777, true);
+        }
         foreach (['make_migration', 'make_command', 'migrate', 'status', 'rollback'] as $name) {
             copy(__DIR__ . '/../../commands/' . $name . '.php', $this->directory . '/commands/' . $name . '.php');
         }
         copy(__DIR__ . '/../../bin/console', $this->directory . '/bin/console');
-        foreach (['src', 'vendor'] as $path) { symlink(dirname(__DIR__, 2) . '/' . $path, $this->directory . '/' . $path); }
+        foreach (['src', 'vendor'] as $path) {
+            symlink(dirname(__DIR__, 2) . '/' . $path, $this->directory . '/' . $path);
+        }
         $this->environment = array_map(static fn(mixed $value): string => (string) $value, Config::all());
         $this->environment = array_replace($this->environment, ['APP_ENV' => 'test', 'APP_DEBUG' => '0', 'DB_HOST' => '127.0.0.1', 'DB_PORT' => '1']);
     }
@@ -31,11 +36,17 @@ final class GeneratorsTest extends TestCase
     {
         foreach (['commands', 'database/migrations'] as $path) {
             chmod($this->directory . '/' . $path, 0755);
-            foreach (glob($this->directory . '/' . $path . '/*') ?: [] as $file) { unlink($file); }
+            foreach (glob($this->directory . '/' . $path . '/*') ?: [] as $file) {
+                unlink($file);
+            }
             rmdir($this->directory . '/' . $path);
         }
-        foreach (['src', 'vendor', 'bin/console'] as $path) { unlink($this->directory . '/' . $path); }
-        foreach (['bin', 'database', ''] as $path) { rmdir($this->directory . '/' . $path); }
+        foreach (['src', 'vendor', 'bin/console'] as $path) {
+            unlink($this->directory . '/' . $path);
+        }
+        foreach (['bin', 'database', ''] as $path) {
+            rmdir($this->directory . '/' . $path);
+        }
     }
 
     public function test_generated_migration_is_utc_valid_and_applies_and_rolls_back_through_real_commands(): void
@@ -202,8 +213,13 @@ final class GeneratorsTest extends TestCase
         $environment = array_replace($this->environment, $environment);
         // proc_open drops empty values from env_vars; env preserves NAME= for the child.
         $empty = array_map(static fn(string $key): string => $key . '=', array_keys(array_filter($environment, static fn(string $value): bool => $value === '')));
-        $process = proc_open(['env', ...$empty, PHP_BINARY, $this->directory . '/bin/console', ...$args],
-            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $this->directory, $environment);
+        $process = proc_open(
+            ['env', ...$empty, PHP_BINARY, $this->directory . '/bin/console', ...$args],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $this->directory,
+            $environment,
+        );
         self::assertIsResource($process);
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);

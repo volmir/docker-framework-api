@@ -1,6 +1,9 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Database;
+
 final class TracedStatement extends \PDOStatement
 {
     protected function __construct() {}

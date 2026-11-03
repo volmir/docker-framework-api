@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Database;
@@ -8,9 +9,7 @@ use RuntimeException;
 
 final class Migrator
 {
-    public function __construct(private PDO $pdo, private string $dir)
-    {
-    }
+    public function __construct(private PDO $pdo, private string $dir) {}
 
     /** @return list<string> */
     public function migrate(): array

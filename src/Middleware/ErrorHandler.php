@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Middleware;
@@ -7,6 +8,7 @@ use App\Config;
 use App\Http\{HttpException, Middleware, Request, Response};
 use App\Log\{Logger, Redactor};
 use Throwable;
+
 final class ErrorHandler implements Middleware
 {
     public function handle(Request $request, callable $next): Response
@@ -21,7 +23,11 @@ final class ErrorHandler implements Middleware
     public static function response(Throwable $error, ?Request $request = null): Response
     {
         $id = $request?->attributes['request_id'] ?? ($_SERVER['HTTP_X_REQUEST_ID'] ?? null);
-        try { $debug = Config::isDebug(); } catch (\RuntimeException) { $debug = false; }
+        try {
+            $debug = Config::isDebug();
+        } catch (\RuntimeException) {
+            $debug = false;
+        }
         $context = ['class' => $error::class, 'message' => $error->getMessage(), 'file' => $error->getFile() . ':' . $error->getLine(), 'request_id' => $id];
         if ($debug) {
             $context['trace'] = array_map(static fn(array $frame): array => array_intersect_key($frame, array_flip(['file', 'line', 'class', 'type', 'function'])), $error->getTrace());

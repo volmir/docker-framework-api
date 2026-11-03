@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Http;
@@ -8,9 +9,7 @@ use App\Database\Connection;
 final class Router
 {
     /** @param array<string, array{0: class-string, 1: string, 2?: list<class-string<Middleware>>}> $routes */
-    public function __construct(private array $routes, private Connection $connection)
-    {
-    }
+    public function __construct(private array $routes, private Connection $connection) {}
 
     public function handle(Request $request): Response
     {

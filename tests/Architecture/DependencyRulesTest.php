@@ -1,38 +1,72 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Tests\Architecture;
+
 use PhpToken;
 use PHPUnit\Framework\TestCase;
-final class DependencyRulesTest extends TestCase {
+
+final class DependencyRulesTest extends TestCase
+{
     public function test_domain_dependencies_and_controller_database_boundaries(): void
     {
         $root = dirname(__DIR__, 2) . '/src';
         $domains = array_fill_keys(array_diff(array_map('basename', glob($root . '/*', GLOB_ONLYDIR) ?: []), ['Http', 'Middleware', 'Controller', 'Database', 'Console', 'Log']), true);
         $errors = $graph = $done = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)) as $file) {
-            if ($file->getExtension() !== 'php') { continue; }
-            $relative = 'src/' . substr($file->getPathname(), strlen($root) + 1); $domain = explode('/', substr($relative, 4))[0];
-            if (!isset($domains[$domain]) && $domain !== 'Controller') { continue; }
-            $tokens = array_values(array_filter(PhpToken::tokenize(file_get_contents($file->getPathname()) ?: ''), static fn(PhpToken $token): bool => !$token->is([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT]))); $prefix = '';
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+            $relative = 'src/' . substr($file->getPathname(), strlen($root) + 1);
+            $domain = explode('/', substr($relative, 4))[0];
+            if (!isset($domains[$domain]) && $domain !== 'Controller') {
+                continue;
+            }
+            $tokens = array_values(array_filter(PhpToken::tokenize(file_get_contents($file->getPathname()) ?: ''), static fn(PhpToken $token): bool => !$token->is([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])));
+            $prefix = '';
             foreach ($tokens as $i => $token) {
-                $name = ltrim($token->text, '\\'); $location = $relative . ':' . $token->line;
-                if ($domain === 'Controller' && (strcasecmp($name, 'PDO') === 0 || (in_array($token->text, ['->', '?->'], true) && in_array(strtolower($tokens[$i + 1]->text ?? ''), ['prepare', 'query'], true) && ($tokens[$i + 2]->text ?? '') === '('))) { $errors[] = $location . ': direct PDO/prepare/query in controller'; }
-                if (in_array($token->text, [';', '}'], true)) { $prefix = ''; }
-                if (!isset($domains[$domain]) || !$token->is([T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED]) || ($tokens[$i - 1]->id ?? null) === T_AS) { continue; }
-                if (($name === 'App' || str_starts_with($name, 'App\\')) && ($tokens[$i + 1]->text ?? '') === '\\' && ($tokens[$i + 2]->text ?? '') === '{') { $prefix = $name . '\\'; }
-                elseif (!str_starts_with($name, 'App\\')) { $name = $prefix . $name; }
-                if (preg_match('/\AApp\\\\(?:Http|Controller|Middleware)(?:\\\\|\z)/i', $name)) { $errors[] = $location . ': forbidden domain dependency ' . $name; }
-                if (preg_match('/\AApp\\\\([^\\\\]+)(?:\\\\|\z)/', $name, $match) && isset($domains[$match[1]]) && $match[1] !== $domain) { $graph[$domain][$match[1]] = $location; }
+                $name = ltrim($token->text, '\\');
+                $location = $relative . ':' . $token->line;
+                if ($domain === 'Controller' && (strcasecmp($name, 'PDO') === 0 || (in_array($token->text, ['->', '?->'], true) && in_array(strtolower($tokens[$i + 1]->text ?? ''), ['prepare', 'query'], true) && ($tokens[$i + 2]->text ?? '') === '('))) {
+                    $errors[] = $location . ': direct PDO/prepare/query in controller';
+                }
+                if (in_array($token->text, [';', '}'], true)) {
+                    $prefix = '';
+                }
+                if (!isset($domains[$domain]) || !$token->is([T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED]) || ($tokens[$i - 1]->id ?? null) === T_AS) {
+                    continue;
+                }
+                if (($name === 'App' || str_starts_with($name, 'App\\')) && ($tokens[$i + 1]->text ?? '') === '\\' && ($tokens[$i + 2]->text ?? '') === '{') {
+                    $prefix = $name . '\\';
+                } elseif (!str_starts_with($name, 'App\\')) {
+                    $name = $prefix . $name;
+                }
+                if (preg_match('/\AApp\\\\(?:Http|Controller|Middleware)(?:\\\\|\z)/i', $name)) {
+                    $errors[] = $location . ': forbidden domain dependency ' . $name;
+                }
+                if (preg_match('/\AApp\\\\([^\\\\]+)(?:\\\\|\z)/', $name, $match) && isset($domains[$match[1]]) && $match[1] !== $domain) {
+                    $graph[$domain][$match[1]] = $location;
+                }
             }
         }
         $visit = static function (string $node, array $path) use (&$visit, &$done, $graph, &$errors): void {
             /** @var list<string> $path */
-            if (($start = array_search($node, $path, true)) !== false) { $errors[] = $graph[$path[count($path) - 1]][$node] . ': domain cycle: ' . implode(' -> ', [...array_slice($path, $start), $node]); return; }
-            if (isset($done[$node])) { return; }
-            foreach (array_keys($graph[$node] ?? []) as $next) { $visit($next, [...$path, $node]); }
+            if (($start = array_search($node, $path, true)) !== false) {
+                $errors[] = $graph[$path[count($path) - 1]][$node] . ': domain cycle: ' . implode(' -> ', [...array_slice($path, $start), $node]);
+                return;
+            }
+            if (isset($done[$node])) {
+                return;
+            }
+            foreach (array_keys($graph[$node] ?? []) as $next) {
+                $visit($next, [...$path, $node]);
+            }
             $done[$node] = true;
         };
-        foreach (array_keys($domains) as $domain) { $visit($domain, []); }
+        foreach (array_keys($domains) as $domain) {
+            $visit($domain, []);
+        }
         self::assertSame([], array_values(array_unique($errors)), implode("\n", $errors));
     }
 
@@ -47,7 +81,9 @@ final class DependencyRulesTest extends TestCase {
                 if ($directory === 'src' && preg_match('~(?:^|/)(?:[^/]*(?:Helpers?|Utils?|Manager)|Support|Common|Misc)(?:/|\.php$|$)~i', $relative)) {
                     $errors[] = $relative . ':1: generic helper name' . $hint;
                 }
-                if (!$file->isFile() || ($file->getExtension() !== 'php' && $directory !== 'bin')) { continue; }
+                if (!$file->isFile() || ($file->getExtension() !== 'php' && $directory !== 'bin')) {
+                    continue;
+                }
                 $source = file_get_contents($file->getPathname()) ?: '';
                 if ($directory === 'src') {
                     $tokens = array_values(array_filter(PhpToken::tokenize($source), static fn(PhpToken $token): bool => !$token->is([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])));

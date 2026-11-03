@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -63,31 +64,49 @@ final class ConnectionTest extends DatabaseTestCase
     public function test_all_returns_a_list_in_query_order_and_binds_integer_limit_and_offset(): void
     {
         self::assertSame([], $this->connection->all('SELECT email FROM users'));
-        $this->connection->run('INSERT INTO users (email, password_hash) VALUES (?, ?), (?, ?), (?, ?)',
-            ['c@example.com', 'hash', 'a@example.com', 'hash', 'b@example.com', 'hash']);
-        self::assertSame([['email' => 'a@example.com'], ['email' => 'b@example.com'], ['email' => 'c@example.com']],
-            $this->connection->all('SELECT email FROM users ORDER BY email'));
-        self::assertSame([['email' => 'b@example.com']],
-            $this->connection->all('SELECT email FROM users ORDER BY email LIMIT ? OFFSET ?', [1, 1]));
-        self::assertSame([['email' => 'c@example.com']],
-            $this->connection->all('SELECT email FROM users ORDER BY email LIMIT :limit OFFSET :offset', ['limit' => 1, ':offset' => 2]));
+        $this->connection->run(
+            'INSERT INTO users (email, password_hash) VALUES (?, ?), (?, ?), (?, ?)',
+            ['c@example.com', 'hash', 'a@example.com', 'hash', 'b@example.com', 'hash'],
+        );
+        self::assertSame(
+            [['email' => 'a@example.com'], ['email' => 'b@example.com'], ['email' => 'c@example.com']],
+            $this->connection->all('SELECT email FROM users ORDER BY email'),
+        );
+        self::assertSame(
+            [['email' => 'b@example.com']],
+            $this->connection->all('SELECT email FROM users ORDER BY email LIMIT ? OFFSET ?', [1, 1]),
+        );
+        self::assertSame(
+            [['email' => 'c@example.com']],
+            $this->connection->all('SELECT email FROM users ORDER BY email LIMIT :limit OFFSET :offset', ['limit' => 1, ':offset' => 2]),
+        );
     }
 
     public function test_named_and_positional_parameters_keep_php_scalar_types_and_null(): void
     {
-        self::assertSame(['id' => 42, 'active' => 1, 'empty_value' => null, 'ratio' => '1.25'],
-            $this->connection->one('SELECT :id AS id, :active AS active, :empty AS empty_value, :ratio AS ratio',
-                ['id' => 42, ':active' => true, 'empty' => null, ':ratio' => 1.25]));
-        self::assertSame(['id' => 7, 'active' => 0, 'empty_value' => null],
-            $this->connection->one('SELECT ? AS id, ? AS active, ? AS empty_value', [7, false, null]));
+        self::assertSame(
+            ['id' => 42, 'active' => 1, 'empty_value' => null, 'ratio' => '1.25'],
+            $this->connection->one(
+                'SELECT :id AS id, :active AS active, :empty AS empty_value, :ratio AS ratio',
+                ['id' => 42, ':active' => true, 'empty' => null, ':ratio' => 1.25],
+            ),
+        );
+        self::assertSame(
+            ['id' => 7, 'active' => 0, 'empty_value' => null],
+            $this->connection->one('SELECT ? AS id, ? AS active, ? AS empty_value', [7, false, null]),
+        );
     }
 
     public function test_run_returns_insert_update_and_delete_affected_rows(): void
     {
-        self::assertSame(2, $this->connection->run('INSERT INTO users (email, password_hash) VALUES (?, ?), (?, ?)',
-            ['first@example.com', 'hash', 'second@example.com', 'hash']));
-        self::assertSame(1, $this->connection->run('UPDATE users SET password_hash = :hash WHERE email = :email',
-            ['hash' => 'changed', ':email' => 'first@example.com']));
+        self::assertSame(2, $this->connection->run(
+            'INSERT INTO users (email, password_hash) VALUES (?, ?), (?, ?)',
+            ['first@example.com', 'hash', 'second@example.com', 'hash'],
+        ));
+        self::assertSame(1, $this->connection->run(
+            'UPDATE users SET password_hash = :hash WHERE email = :email',
+            ['hash' => 'changed', ':email' => 'first@example.com'],
+        ));
         self::assertSame(0, $this->connection->run('UPDATE users SET password_hash = ? WHERE email = ?', ['changed', 'first@example.com']));
         self::assertSame(2, $this->connection->run('DELETE FROM users'));
         self::assertSame(0, $this->connection->run('DELETE FROM users'));

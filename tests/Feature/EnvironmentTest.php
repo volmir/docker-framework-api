@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -112,8 +113,12 @@ final class EnvironmentTest extends TestCase
         $environment = array_filter($environment, static fn(mixed $value): bool => $value !== null);
         // proc_open drops empty values from env_vars; env preserves NAME= for the child.
         $empty = array_map(static fn(string $key): string => $key . '=', array_keys(array_filter($environment, static fn(mixed $value): bool => $value === '')));
-        $process = proc_open(['env', ...$empty, ...$command],
-            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, env_vars: $environment);
+        $process = proc_open(
+            ['env', ...$empty, ...$command],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            env_vars: $environment,
+        );
         self::assertIsResource($process);
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);

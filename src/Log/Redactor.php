@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Log;
@@ -51,7 +52,9 @@ final class Redactor
             }
         };
         $collect(array_merge($_GET, $_POST, $request === null ? [] : $request->query, $request === null ? [] : $request->body));
-        if ($context && is_array($data)) { $collect($data); }
+        if ($context && is_array($data)) {
+            $collect($data);
+        }
         uksort($values, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
         $clean = static function (mixed $value) use (&$clean, $values, $context): mixed {
             if (is_array($value)) {

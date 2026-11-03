@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Unit;
@@ -103,8 +104,11 @@ PHP);
         $file = tempnam(sys_get_temp_dir(), 'errors-script-');
         self::assertIsString($file);
         file_put_contents($file, '<?php ' . ($register ? 'require ' . $errors . '; App\Errors::register(); $_ENV["APP_DEBUG"] = "0"; ' : '') . $script);
-        $process = proc_open([PHP_BINARY, $file],
-            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $process = proc_open(
+            [PHP_BINARY, $file],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
         self::assertIsResource($process);
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);

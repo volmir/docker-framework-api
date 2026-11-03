@@ -1,7 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Database;
-use PDO, PDOStatement;
+
+use PDO;
+use PDOStatement;
+
 final class TracedPdo extends PDO
 {
     public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false

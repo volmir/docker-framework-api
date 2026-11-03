@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Users;
@@ -9,9 +10,7 @@ use RuntimeException;
 
 final class Users
 {
-    public function __construct(private Connection $connection)
-    {
-    }
+    public function __construct(private Connection $connection) {}
 
     /** @return array{id:int, email:string, created_at:string} */
     public function create(string $email, string $password): array

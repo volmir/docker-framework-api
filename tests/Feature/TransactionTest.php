@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -28,7 +29,9 @@ final class TransactionTest extends DatabaseTestCase
         $_ENV = $this->environment;
         parent::tearDown();
         $delete = (new Connection())->pdo()->prepare('DELETE FROM users WHERE email = ?');
-        foreach ($this->emails as $email) { $delete->execute([$email]); }
+        foreach ($this->emails as $email) {
+            $delete->execute([$email]);
+        }
     }
 
     /** @return iterable<string, array{bool}> */
@@ -68,13 +71,19 @@ final class TransactionTest extends DatabaseTestCase
             $emails = [$this->email(), $this->email()];
             try {
                 $connection->transaction(function (Connection $received) use ($emails, $expected): never {
-                    foreach ($emails as $email) { $this->insert($received, $email); }
+                    foreach ($emails as $email) {
+                        $this->insert($received, $email);
+                    }
                     throw $expected;
                 });
                 self::fail('Expected the callback error');
-            } catch (\Throwable $actual) { self::assertSame($expected, $actual); }
+            } catch (\Throwable $actual) {
+                self::assertSame($expected, $actual);
+            }
             self::assertFalse($connection->pdo()->inTransaction());
-            foreach ($emails as $email) { self::assertSame(0, $this->countEmail($email)); }
+            foreach ($emails as $email) {
+                self::assertSame(0, $this->countEmail($email));
+            }
         }
     }
 
@@ -88,7 +97,9 @@ final class TransactionTest extends DatabaseTestCase
                 $received->transaction(static fn(Connection $_connection): never => self::fail('Nested callback must not execute'));
             });
             self::fail('Expected nested transaction rejection');
-        } catch (LogicException $error) { self::assertStringContainsString('Nested transactions are not supported', $error->getMessage()); }
+        } catch (LogicException $error) {
+            self::assertStringContainsString('Nested transactions are not supported', $error->getMessage());
+        }
         self::assertFalse($connection->pdo()->inTransaction());
         self::assertSame(0, $this->countEmail($email));
     }
@@ -98,7 +109,9 @@ final class TransactionTest extends DatabaseTestCase
         try {
             $this->connection->transaction(static fn(Connection $_connection): never => self::fail('Callback must not execute'));
             self::fail('Expected existing transaction rejection');
-        } catch (LogicException $error) { self::assertStringContainsString('already has an active transaction', $error->getMessage()); }
+        } catch (LogicException $error) {
+            self::assertStringContainsString('already has an active transaction', $error->getMessage());
+        }
         self::assertTrue($this->pdo->inTransaction());
     }
 
@@ -112,7 +125,9 @@ final class TransactionTest extends DatabaseTestCase
                 throw $expected;
             });
             self::fail('Expected callback error');
-        } catch (RuntimeException $actual) { self::assertSame($expected, $actual); }
+        } catch (RuntimeException $actual) {
+            self::assertSame($expected, $actual);
+        }
         self::assertFalse($connection->pdo()->inTransaction());
     }
 

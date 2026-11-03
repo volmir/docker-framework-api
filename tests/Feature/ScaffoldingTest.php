@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Feature;
@@ -30,11 +31,16 @@ final class ScaffoldingTest extends TestCase
     protected function tearDown(): void
     {
         $_ENV = $this->environment;
-        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->directory,
-            \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(
+            $this->directory,
+            \FilesystemIterator::SKIP_DOTS,
+        ), \RecursiveIteratorIterator::CHILD_FIRST);
         foreach ($files as $file) {
-            if ($file->isDir() && !$file->isLink()) { rmdir($file->getPathname()); }
-            else { unlink($file->getPathname()); }
+            if ($file->isDir() && !$file->isLink()) {
+                rmdir($file->getPathname());
+            } else {
+                unlink($file->getPathname());
+            }
         }
         rmdir($this->directory);
     }
@@ -84,7 +90,9 @@ final class ScaffoldingTest extends TestCase
             self::assertStringContainsString("'GET /blog_posts' => [BlogPostController::class, 'index', [ApiKeyAuth::class]],", $output);
             $content = file_get_contents($file);
             self::assertIsString($content);
-            if ($source !== null) { self::assertSame($source, $content); }
+            if ($source !== null) {
+                self::assertSame($source, $content);
+            }
             $source = $content;
             $this->reject('controller', [$name], 'already exists');
             self::assertSame($content, file_get_contents($file));
@@ -96,7 +104,8 @@ final class ScaffoldingTest extends TestCase
     {
         $file = $this->routeFixture();
         chmod($file, 0640);
-        $owner = fileowner($file); $group = filegroup($file);
+        $owner = fileowner($file);
+        $group = filegroup($file);
         $this->generate('controller', ['RegisteredPost', 'index', 'show', 'create', '--routes']);
         $source = file_get_contents($file);
         self::assertIsString($source);
@@ -105,14 +114,18 @@ final class ScaffoldingTest extends TestCase
         self::assertSame(1, substr_count($source, '    // make:controller: new routes are inserted above this line'));
         clearstatcache();
         self::assertSame(0640, fileperms($file) & 07777);
-        self::assertSame($owner, fileowner($file)); self::assertSame($group, filegroup($file));
+        self::assertSame($owner, fileowner($file));
+        self::assertSame($group, filegroup($file));
         require $this->directory . '/src/Controller/RegisteredPostController.php';
         copy(__DIR__ . '/../../commands/routes.php', $this->directory . '/commands/routes.php');
         file_put_contents($this->directory . '/src/middleware.php', '<?php return [];');
         $command = require $this->directory . '/commands/routes.php';
         ob_start();
-        try { self::assertSame(0, $command['execute'](['--check'], new Connection())); }
-        finally { ob_end_clean(); }
+        try {
+            self::assertSame(0, $command['execute'](['--check'], new Connection()));
+        } finally {
+            ob_end_clean();
+        }
         self::assertSame(['RegisteredPostController.php'], array_map('basename', glob($this->directory . '/src/Controller/*') ?: []));
         self::assertSame(['Controller', 'middleware.php', 'routes.php'], array_map('basename', glob($this->directory . '/src/*') ?: []));
     }
@@ -145,10 +158,17 @@ final class ScaffoldingTest extends TestCase
         $command = require $this->directory . '/commands/make_controller.php';
         ob_start();
         try {
-            try { $command['execute'](['MissingMarker', '--routes'], new Connection()); self::fail('Expected refusal'); }
-            catch (RuntimeException $error) { self::assertStringContainsString('marker', $error->getMessage()); }
-            $output = ob_get_contents(); self::assertIsString($output);
-        } finally { ob_end_clean(); }
+            try {
+                $command['execute'](['MissingMarker', '--routes'], new Connection());
+                self::fail('Expected refusal');
+            } catch (RuntimeException $error) {
+                self::assertStringContainsString('marker', $error->getMessage());
+            }
+            $output = ob_get_contents();
+            self::assertIsString($output);
+        } finally {
+            ob_end_clean();
+        }
         self::assertStringContainsString("'GET /missing_markers'", $output);
         self::assertSame($source, file_get_contents($file));
         self::assertFileDoesNotExist($this->directory . '/src/Controller/MissingMarkerController.php');
@@ -161,13 +181,21 @@ final class ScaffoldingTest extends TestCase
             'LoadRollback' => "<?php\n\$routes = [\n    // make:controller: new routes are inserted above this line\n];\nif (\$routes !== []) { throw new RuntimeException('Reload refused'); }\nreturn \$routes;\n",
             'MarkerInComment' => "<?php\n/*\n    // make:controller: new routes are inserted above this line\n*/\nreturn [];\n",
         ] as $name => $source) {
-            $file = $this->routeFixture(); file_put_contents($file, $source); chmod($file, 0640);
-            $owner = fileowner($file); $group = filegroup($file);
-            $this->reject('controller', [$name, '--routes'], match ($name) { 'LintRollback' => 'lint failed', 'LoadRollback' => 'Reload refused', default => 'did not load inserted routes' });
+            $file = $this->routeFixture();
+            file_put_contents($file, $source);
+            chmod($file, 0640);
+            $owner = fileowner($file);
+            $group = filegroup($file);
+            $this->reject('controller', [$name, '--routes'], match ($name) {
+                'LintRollback' => 'lint failed',
+                'LoadRollback' => 'Reload refused',
+                default => 'did not load inserted routes',
+            });
             clearstatcache();
             self::assertSame($source, file_get_contents($file));
             self::assertSame(0640, fileperms($file) & 07777);
-            self::assertSame($owner, fileowner($file)); self::assertSame($group, filegroup($file));
+            self::assertSame($owner, fileowner($file));
+            self::assertSame($group, filegroup($file));
             self::assertFileDoesNotExist($this->directory . '/src/Controller/' . $name . 'Controller.php');
             self::assertSame(['routes.php'], array_map('basename', glob($this->directory . '/src/*') ?: []));
             self::assertSame([], glob($this->directory . '/src/.routes-*'));
@@ -176,15 +204,19 @@ final class ScaffoldingTest extends TestCase
 
     public function test_controller_routes_refuse_production_and_roll_back_when_controller_cannot_be_written(): void
     {
-        $file = $this->routeFixture(); $source = file_get_contents($file);
+        $file = $this->routeFixture();
+        $source = file_get_contents($file);
         $_ENV['APP_ENV'] = 'production';
         $this->reject('controller', ['ProductionRoute', '--routes'], 'disabled in production');
         $_ENV['APP_ENV'] = 'test';
         self::assertSame($source, file_get_contents($file));
         self::assertDirectoryDoesNotExist($this->directory . '/src/Controller');
         mkdir($this->directory . '/src/Controller', 0555);
-        try { $this->reject('controller', ['UnwritableRoute', '--routes'], 'not writable'); }
-        finally { chmod($this->directory . '/src/Controller', 0755); }
+        try {
+            $this->reject('controller', ['UnwritableRoute', '--routes'], 'not writable');
+        } finally {
+            chmod($this->directory . '/src/Controller', 0755);
+        }
         self::assertSame($source, file_get_contents($file));
         self::assertSame([], glob($this->directory . '/src/Controller/*'));
         self::assertSame([], glob($this->directory . '/src/.routes-*'));
@@ -192,7 +224,9 @@ final class ScaffoldingTest extends TestCase
 
     private function routeFixture(string $entries = ''): string
     {
-        if (!is_dir($this->directory . '/src')) { mkdir($this->directory . '/src', 0755); }
+        if (!is_dir($this->directory . '/src')) {
+            mkdir($this->directory . '/src', 0755);
+        }
         $file = $this->directory . '/src/routes.php';
         file_put_contents($file, "<?php\nreturn [\n" . $entries . "    // make:controller: new routes are inserted above this line\n];\n");
         return $file;
@@ -214,7 +248,9 @@ final class ScaffoldingTest extends TestCase
         $expected = Response::json(['passed' => true]);
         $called = 0;
         $response = $middleware->handle($request, static function (Request $next) use ($request, $expected, &$called): Response {
-            self::assertSame($request, $next); ++$called; return $expected;
+            self::assertSame($request, $next);
+            ++$called;
+            return $expected;
         });
         self::assertSame($expected, $response);
         self::assertSame(1, $called);
@@ -262,17 +298,24 @@ final class ScaffoldingTest extends TestCase
             foreach (['controller' => 'PrivatePost', 'middleware' => 'PrivateLayer'] as $kind => $name) {
                 $this->reject($kind, [$name], 'not writable');
             }
-        } finally { chmod($this->directory . '/src', 0755); }
+        } finally {
+            chmod($this->directory . '/src', 0755);
+        }
         self::assertSame([], glob($this->directory . '/src/*'));
     }
 
     public function test_generator_creates_0755_directories_and_0644_files_even_with_a_strict_umask(): void
     {
         $mask = umask(0077);
-        try { $relative = (new Generator($this->directory))->write('src/Controller/Mode.php', '<?php'); }
-        finally { umask($mask); }
+        try {
+            $relative = (new Generator($this->directory))->write('src/Controller/Mode.php', '<?php');
+        } finally {
+            umask($mask);
+        }
         self::assertSame('src/Controller/Mode.php', $relative);
-        foreach (['src', 'src/Controller'] as $dir) { self::assertSame(0755, fileperms($this->directory . '/' . $dir) & 0777); }
+        foreach (['src', 'src/Controller'] as $dir) {
+            self::assertSame(0755, fileperms($this->directory . '/' . $dir) & 0777);
+        }
         self::assertSame(0644, fileperms($this->directory . '/' . $relative) & 0777);
         self::assertSame('BlogPost', Generator::studly('blog-post'));
         self::assertSame('BlogPost', Generator::studly('blog_post'));
@@ -314,13 +357,18 @@ final class ScaffoldingTest extends TestCase
         $test = $this->directory . '/tests/SamplePosts/SamplePostsTest.php';
         self::assertStringStartsWith("src/SamplePosts/SamplePosts.php\ntests/SamplePosts/SamplePostsTest.php\n", $output);
         self::assertStringContainsString('make migration name=create_sample_posts_table', $output);
-        foreach ([$source, $test] as $file) { $this->lint($file); self::assertSame(0644, fileperms($file) & 0777); }
+        foreach ([$source, $test] as $file) {
+            $this->lint($file);
+            self::assertSame(0644, fileperms($file) & 0777);
+        }
         $this->assertProcessSucceeds([PHP_BINARY, dirname(__DIR__, 2) . '/vendor/bin/phpstan', 'analyse', '--no-progress', '--memory-limit=256M', $source, $test]);
         $bootstrap = $this->directory . '/bootstrap.php';
         file_put_contents($bootstrap, '<?php require ' . var_export(dirname(__DIR__, 2) . '/vendor/autoload.php', true) . '; require ' . var_export($source, true) . ';');
         mkdir($this->directory . '/tests/Architecture', 0755);
         copy(__DIR__ . '/../Architecture/DependencyRulesTest.php', $this->directory . '/tests/Architecture/DependencyRulesTest.php');
-        foreach (['bin', 'public'] as $path) { mkdir($this->directory . '/' . $path, 0755); }
+        foreach (['bin', 'public'] as $path) {
+            mkdir($this->directory . '/' . $path, 0755);
+        }
         copy(dirname(__DIR__, 2) . '/composer.json', $this->directory . '/composer.json');
         $result = $this->assertProcessSucceeds([PHP_BINARY, dirname(__DIR__, 2) . '/vendor/bin/phpunit', '--bootstrap', $bootstrap, $this->directory . '/tests']);
         self::assertStringContainsString('OK (3 tests, 3 assertions)', $result);
@@ -362,8 +410,11 @@ final class ScaffoldingTest extends TestCase
     public function test_domain_removes_its_new_source_if_writing_the_test_fails(): void
     {
         mkdir($this->directory . '/tests', 0555);
-        try { $this->reject('domain', ['ReadOnlyPosts'], 'not writable'); }
-        finally { chmod($this->directory . '/tests', 0755); }
+        try {
+            $this->reject('domain', ['ReadOnlyPosts'], 'not writable');
+        } finally {
+            chmod($this->directory . '/tests', 0755);
+        }
         self::assertFileDoesNotExist($this->directory . '/src/ReadOnlyPosts/ReadOnlyPosts.php');
         self::assertFileDoesNotExist($this->directory . '/tests/ReadOnlyPosts/ReadOnlyPostsTest.php');
     }
@@ -378,15 +429,21 @@ final class ScaffoldingTest extends TestCase
             $output = ob_get_contents();
             self::assertIsString($output);
             return $output;
-        } finally { ob_end_clean(); }
+        } finally {
+            ob_end_clean();
+        }
     }
 
     /** @param list<string> $args */
     private function reject(string $kind, array $args, ?string $message = null): void
     {
-        try { $this->generate($kind, $args); self::fail('Expected generation to fail'); }
-        catch (RuntimeException $error) {
-            if ($message !== null) { self::assertStringContainsString($message, $error->getMessage()); }
+        try {
+            $this->generate($kind, $args);
+            self::fail('Expected generation to fail');
+        } catch (RuntimeException $error) {
+            if ($message !== null) {
+                self::assertStringContainsString($message, $error->getMessage());
+            }
             if ($message === 'not writable' || $message === 'disabled in production') {
                 self::assertStringContainsString('dev environment', $error->getMessage());
             }
@@ -403,9 +460,12 @@ final class ScaffoldingTest extends TestCase
     {
         $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         self::assertIsResource($process);
-        $output = stream_get_contents($pipes[1]); $error = stream_get_contents($pipes[2]);
-        self::assertIsString($output); self::assertIsString($error);
-        fclose($pipes[1]); fclose($pipes[2]);
+        $output = stream_get_contents($pipes[1]);
+        $error = stream_get_contents($pipes[2]);
+        self::assertIsString($output);
+        self::assertIsString($error);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
         self::assertSame(0, proc_close($process), $output . $error);
         return $output . $error;
     }
