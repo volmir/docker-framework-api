@@ -8,6 +8,15 @@ before calling the notes endpoint, seed or command.
 
 ## Add an endpoint
 
+Console syntax: `make:controller <Name> [action ...] [--routes]`.
+The optional Make parameter `routes=1` forwards `--routes`:
+
+```sh
+make controller name=Post actions="index show" routes=1
+```
+
+Omit `routes=1` (or `--routes`) to print route entries for manual registration.
+
 Start with the controller generator in the development bind mount:
 
 ```sh
