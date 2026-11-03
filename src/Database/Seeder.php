@@ -22,6 +22,7 @@ final class Seeder
             ? (glob(rtrim($this->dir, '/') . '/*.php') ?: [])
             : [rtrim($this->dir, '/') . '/' . $name . '.php'];
         sort($files, SORT_STRING);
+        /** @var array<string, array{run:callable(PDO):void}> $seeders */
         $seeders = [];
         foreach ($files as $file) {
             if (!preg_match('/\A[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.php\z/', basename($file))) {

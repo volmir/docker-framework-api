@@ -116,6 +116,7 @@ final class UserControllerTest extends DatabaseTestCase
             $ids[] = (int) $this->pdo->lastInsertId();
         }
         foreach ([[[], 20, 0, 20], [['limit' => null, 'offset' => null], 20, 0, 20],
+            [['limit' => '5', 'offset' => '10'], 5, 10, 5],
             [['limit' => '100', 'offset' => '3', 'extra' => 'ignored'], 100, 3, 100],
             [['limit' => '2', 'offset' => '104'], 2, 104, 1], [['offset' => '200'], 20, 200, 0]] as [$query, $limit, $offset, $count]) {
             $response = $this->request('GET', '/users', $query);

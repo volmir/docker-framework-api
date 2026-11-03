@@ -24,7 +24,7 @@
     },
     "scripts": {
         "test": "phpunit",
-        "lint": "find src bin public tests -name '*.php' -print0 | xargs -0 -n1 php -l",
+        "lint": "find src bin public commands database tests -name '*.php' -print0 | xargs -0 -n1 php -l",
         "analyse": "phpstan analyse --memory-limit=256M"
     }
 }

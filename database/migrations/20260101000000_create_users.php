@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
 
-return [
+/** @var array{up:callable(PDO):void, down:callable(PDO):void} $migration */
+$migration = [
     'up' => function (PDO $pdo): void {
         $pdo->exec("
             CREATE TABLE users (
@@ -18,3 +19,5 @@ return [
         $pdo->exec("DROP TABLE users");
     },
 ];
+
+return $migration;

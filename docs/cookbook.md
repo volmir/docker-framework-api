@@ -8,56 +8,67 @@ before calling the notes endpoint, seed or command.
 
 ## Add an endpoint
 
-Create `src/Controller/GreetingController.php`. The router passes its Connection
-to every controller; this endpoint does not open it.
+Start with the controller generator in the development bind mount:
 
-<!-- snippet: greeting-controller -->
-```php
-<?php
-declare(strict_types=1);
-
-namespace App\Controller;
-
-use App\Database\Connection;
-use App\Http\Request;
-use App\Http\Response;
-
-final class GreetingController
-{
-    public function __construct(private Connection $connection)
-    {
-    }
-
-    public function show(Request $request): Response
-    {
-        return Response::json(['data' => ['message' => 'Hello']]);
-    }
-}
+```sh
+make controller name=Greeting actions="show"
 ```
 
-Add this entry inside the array returned by `src/routes.php`. Fully qualified
-class names work without adding imports. The path is literal, without placeholders.
+It creates `src/Controller/GreetingController.php` and prints route entries.
+Add `use App\Controller\GreetingController;` to `src/routes.php` (ApiKeyAuth is
+already imported), then paste the printed entry inside its route array:
 
 <!-- snippet: greeting-route -->
 ```php
-'GET /greeting' => [\App\Controller\GreetingController::class, 'show', [\App\Middleware\ApiKeyAuth::class]],
+'GET /greetings/show' => [GreetingController::class, 'show', [ApiKeyAuth::class]],
 ```
+
+Check the manual registration:
+
+```sh
+make routes-check
+```
+
+The generator never edits route or global middleware registration. It provides
+only a working skeleton returning `{"data":[]}`; developers write SQL and
+validation. `src/Controller/UserController.php` is the working example. The
+constructor accepts `Connection $_connection` even when the endpoint does not use
+the database, without storing an unused property. Promote it to a property when
+adding SQL, as in UserController.
+Change the generated `show` method to return a greeting:
+
+<!-- snippet: greeting-controller -->
+```php
+public function show(Request $request): Response
+{
+    return Response::json(['data' => ['message' => 'Hello']]);
+}
+```
+
+Paths are literal, without placeholders. Pass resource parameters through query
+strings, for example `/users/show?id=1`, and validate `$request->query` with
+`Validator::validate()` before using them (see [input validation](#validate-input));
+do not add `/users/{id}` placeholders.
 
 Use an API key configured as described in [rotation](#rotate-an-api-key). Set the
 shell variable `API_KEY` to the plaintext key you saved; only its hash goes in .env.
 
 <!-- snippet: greeting-request -->
 ```sh
-curl -i http://localhost:8082/greeting -H "X-Api-Key: $API_KEY"
+curl -i http://localhost:8082/greetings/show -H "X-Api-Key: $API_KEY"
 ```
 
-Expected: 200 and `{"data":{"message":"Hello"}}`. In development, the mounted
-code is picked up automatically. Production needs a new image and authoritative
-autoload map, so rebuild it after adding classes.
+Expected: 200 and `{"data":{"message":"Hello"}}`. Add a feature test through Router
+for the new route, its authentication and validation; use
+`tests/Feature/RouterTest.php` and [the controller test recipe](#test-a-controller-without-http)
+as examples, then run `make test`. Development picks up mounted code automatically;
+production needs rebuilt code and its authoritative autoload map.
 
 ## Write a middleware
 
-Create `src/Middleware/ExampleHeader.php`. Middleware receives a Request and the
+Start with `make middleware name=ExampleHeader`, then edit the generated
+`src/Middleware/ExampleHeader.php`. Registration is manual as described in the
+following recipes. Middleware receives a Request and the
 next callable, then returns a Response. Return early to reject a request; call
 `$next($request)` to continue. Request attribute changes use `withAttribute()`.
 
@@ -89,7 +100,7 @@ arguments. Read settings through `App\Config` when a middleware needs them.
 
 <!-- snippet: greeting-route-middleware -->
 ```php
-'GET /greeting' => [\App\Controller\GreetingController::class, 'show', [\App\Middleware\ApiKeyAuth::class, \App\Middleware\ExampleHeader::class]],
+'GET /greetings/show' => [\App\Controller\GreetingController::class, 'show', [\App\Middleware\ApiKeyAuth::class, \App\Middleware\ExampleHeader::class]],
 ```
 
 Repeat the greeting request: a successful response now has `X-Example: enabled`.
@@ -220,12 +231,12 @@ Add a route with authentication before the JSON media-type check:
 
 <!-- snippet: greeting-create-route -->
 ```php
-'POST /greeting' => [\App\Controller\GreetingController::class, 'create', [\App\Middleware\ApiKeyAuth::class, \App\Middleware\RequireJson::class]],
+'POST /greetings' => [\App\Controller\GreetingController::class, 'create', [\App\Middleware\ApiKeyAuth::class, \App\Middleware\RequireJson::class]],
 ```
 
 <!-- snippet: greeting-create-request -->
 ```sh
-curl -i -X POST http://localhost:8082/greeting \
+curl -i -X POST http://localhost:8082/greetings \
   -H "X-Api-Key: $API_KEY" -H 'Content-Type: application/json' \
   -d '{"name":"Ada"}'
 ```
@@ -260,7 +271,48 @@ type check stops further checks for that field. Messages contain rule names,
 never submitted values. Unknown rules are programming errors (500 through the
 error handler).
 
+## Query the database
+
+Use the existing `Connection` in a controller, domain or command. It opens PDO
+only when needed; all three methods prepare, bind values and execute:
+
+```php
+$user = $connection->one('SELECT id, email FROM users WHERE id = :id', ['id' => 1]);
+$users = $connection->all('SELECT id, email FROM users ORDER BY id LIMIT ? OFFSET ?', [5, 10]);
+$affected = $connection->run('UPDATE users SET email = :email WHERE id = :id',
+    [':email' => 'reader@example.com', 'id' => 1]);
+```
+
+`one()` returns the first associative row or null; `all()` returns a list of
+associative rows, including `[]` when nothing matches. `run()` returns affected
+rows: MySQL `ON DUPLICATE KEY UPDATE` reports 1 for an insert, 2 for a changed
+update, and 0 if the existing row is unchanged. PDOException propagates unchanged,
+including `errorInfo[1]` (1062 for a duplicate key).
+
+Named parameter keys accept `id` or `:id`. Positional arrays start at index 0
+and bind to positions starting at 1. PHP int, bool and null bind as PARAM_INT,
+PARAM_BOOL and PARAM_NULL; other scalar values bind as PARAM_STR. Keep LIMIT and
+OFFSET as ints, as in the example. Helpers inside `transaction()` use the same
+connection, and debug mode counts their executions in Server-Timing.
+
+Arrays and objects throw InvalidArgumentException. For `IN (...)`, generate one
+placeholder per scalar value; passing `[$ids]` does not expand a list:
+
+```php
+$ids = [1, 2, 3];
+$users = $ids === [] ? [] : $connection->all(
+    'SELECT id, email FROM users WHERE id IN (' . implode(',', array_fill(0, count($ids), '?')) . ') ORDER BY id',
+    $ids,
+);
+```
+
+Handle the empty list explicitly. Only placeholder syntax is constructed here;
+values stay in bound parameters, including strings containing quotes.
+
 ## Paginate a query
+
+This example keeps SQL in a controller with one consumer. Use
+[the domain recipe](#add-a-domain) when another consumer needs the operation.
 
 Create `src/Controller/NoteController.php`. This uses the notes table from the
 next recipe. Bound integer parameters work with native PDO prepares.
@@ -276,7 +328,6 @@ use App\Database\Connection;
 use App\Http\Request;
 use App\Http\Response;
 use App\Http\Validator;
-use PDO;
 
 final class NoteController
 {
@@ -291,11 +342,8 @@ final class NoteController
         ]);
         $limit = $query['limit'] ?? 20;
         $offset = $query['offset'] ?? 0;
-        $statement = $this->connection->pdo()->prepare('SELECT id, title, created_at FROM notes ORDER BY id LIMIT ? OFFSET ?');
-        $statement->bindValue(1, $limit, PDO::PARAM_INT);
-        $statement->bindValue(2, $offset, PDO::PARAM_INT);
-        $statement->execute();
-        return Response::json(['data' => $statement->fetchAll(), 'meta' => ['limit' => $limit, 'offset' => $offset]]);
+        $notes = $this->connection->all('SELECT id, title, created_at FROM notes ORDER BY id LIMIT ? OFFSET ?', [$limit, $offset]);
+        return Response::json(['data' => $notes, 'meta' => ['limit' => $limit, 'offset' => $offset]]);
     }
 }
 ```
@@ -317,6 +365,124 @@ curl -i 'http://localhost:8082/notes?limit=100&offset=1' -H "X-Api-Key: $API_KEY
 Expected: `meta.limit` is 100, `meta.offset` is 1, and the second seeded note is
 returned. A limit above 100 returns 422 with `details.limit`; it is not clamped.
 Pagination does not compute a total count.
+
+## When to extract controller logic
+
+Keep the controller as a thin HTTP adapter: validate input, call the operation,
+and map its result or domain exception to HTTP. Extract logic into a concrete
+class only when a second consumer needs it (a command, seeder or test); do not
+call a controller from commands. The directory layout and dependency rules are
+kept in [Architecture](architecture.md), together with the thresholds to review.
+
+Users is the working example: UserController and the two commands call
+`App\Users\Users`. It owns Argon2id hashing and SQL; `App\Users\EmailTaken`
+is a RuntimeException beside the class. The controller maps it to 409; Console
+prints its message and returns 1. Input format validation stays in the adapters.
+The existing API tests exercise the same HTTP behavior after extraction.
+
+### When a controller grows
+
+Review extraction when a second consumer needs the logic, a transaction spans
+multiple queries, or an action grows beyond roughly 40 lines. Complexity is a
+reason to review the boundary, not to create Service/DTO/Repository files for
+every entity. Follow [the layer decision](decisions.md#layers-are-earned-not-assumed).
+
+The Users extraction is already implemented; use it as a step-by-step reference:
+
+1. Preserve the existing HTTP contract with
+   [UserControllerTest](../tests/Feature/UserControllerTest.php): validation errors,
+   duplicate email, pagination, public fields and Location must keep their behavior.
+2. Create one concrete [Users](../src/Users/Users.php) class accepting Connection.
+   Move hashing, INSERT and SELECTs there as create/list/find. Keep Validator and
+   Request/Response in the adapters; introduce no repository interface.
+3. Put [EmailTaken](../src/Users/EmailTaken.php) beside Users. Convert MySQL error
+   1062 to that exception and let other database failures propagate.
+4. Make [UserController](../src/Controller/UserController.php) construct Users,
+   validate input and delegate. Map EmailTaken to 409, a missing find result to
+   404, and successful creation to 201 with Location.
+5. Make [users:create](../commands/users-create.php) and
+   [users:list](../commands/users-list.php) validate their CLI input and call the
+   same Users methods directly; neither command constructs a controller.
+6. Cover shared SQL and both commands in [tests/Users](../tests/Users/), and run
+   `make check` without rewriting the existing API tests to accept changed behavior.
+
+Users follows these steps today; HealthController keeps its single-consumer
+`SELECT 1` through `Connection::one()`. No new layer or file is needed merely to follow this recipe.
+
+```sh
+docker compose exec php bin/console users:create a@example.com
+docker compose exec -T php bin/console users:list --limit=20
+```
+
+The create command prompts with terminal echo disabled and restores the terminal
+settings after reading. For automation, supply one password line on STDIN with
+`docker compose exec -T`; read it from your secret store, never append it to the
+command arguments or place a literal password in shell history. Repeating an
+email reports `Email is already taken` and exits 1. Both commands print only
+id/email/created_at; list defaults to 20 rows and accepts limits from 1 to 100.
+
+## Add a domain
+
+Start with the domain generator in the development bind mount:
+
+```sh
+make domain name=Notes
+```
+
+It creates `src/Notes/Notes.php` and `tests/Notes/NotesTest.php`, then prints
+`make migration name=create_notes_table`. The constructor accepts Connection
+without opening it or storing an unused property; the test extends DatabaseTestCase.
+Names must be StudlyCase and meaningfully plural. Service/Repository/Manager
+suffixes are rejected with a reminder to name the domain for its meaning.
+Both paths are checked before writing; existing files and production are refused.
+
+1. Confirm the working second consumer. Implement its operations in the generated
+   final Notes class, storing Connection only when it is used. Add domain
+   exceptions beside it when needed; they extend RuntimeException without HTTP
+   knowledge. The generator supplies no SQL, exception hierarchy or TODOs.
+2. Create the schema change with `make migration name=create_notes_table`, write
+   up/down SQL and run `make migrate`; see [migrations](#add-a-migration).
+3. Run `make controller name=Note actions="index show create"`. In its actions,
+   validate query/body with Validator. Rename its unused `$_connection` argument
+   to `$connection` and construct `new \App\Notes\Notes($connection)` in the
+   constructor, as UserController constructs Users. Delegate operations and
+   translate domain exceptions to HTTP; store Connection only if it is used.
+4. Paste the generated imports/routes into `src/routes.php`, then run
+   `make routes-check`. Add the second command/seeder by calling Notes directly;
+   never construct NoteController there.
+5. Extend the constructor test in `tests/Notes/`, using DatabaseTestCase and
+   transaction rollback. Domain tests are discovered automatically; cover both
+   adapters and run `make check`, including the architecture rules. Follow
+   `tests/Users/UsersTest.php` and `tests/Users/CommandsTest.php`; CLI children use
+   separate connections, so their tests also delete their own committed rows.
+
+For an operation spanning multiple queries, use `Connection::transaction($fn)`
+and pass the callback's Connection into the domain. It commits and returns the
+callback result, or rolls back and rethrows the same Throwable. Nested or already
+active transactions raise LogicException. DatabaseTestCase already starts a
+transaction; tests exercising this helper use a separate Connection and clean up
+their committed rows, as in `tests/Feature/TransactionTest.php`.
+
+## Where to put a new helper
+
+Use this decision tree; the canonical table and five rules are in
+[Helpers](architecture.md#helpers).
+
+```text
+Only test setup?
+├─ Yes → the test class, or tests/Support for shared fixtures.
+└─ No → Only one class needs this implementation detail?
+   ├─ Yes → a private method of that class.
+   └─ No → Does an existing domain/infrastructure class own the operation?
+      ├─ Yes → a method of that class (e.g. Console::routesTable).
+      └─ No → Only a command, migration or seed needs it?
+         ├─ Yes → a closure inside its returned array.
+         └─ No → At least two actual consumers from different layers?
+            ├─ Yes → App\<MeaningfulName>.
+            └─ No → keep it beside its caller until sharing is needed.
+```
+
+Run `make check` after placing the code.
 
 ## Add a migration
 

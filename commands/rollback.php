@@ -5,10 +5,12 @@ use App\Console\Console;
 use App\Config;
 use App\Database\Connection;
 
-return [
+/** @var array{name:string, description:string, execute:callable(list<string>, Connection):int} $command */
+$command = [
     'name' => 'rollback',
     'description' => 'Rollback migration batches',
     'execute' => static function (array $args, Connection $connection): int {
+        /** @var list<string> $args */
         if (Config::isProduction() && !in_array('--force', $args, true)) {
             throw new RuntimeException('Rollback in production requires --force');
         }
@@ -29,3 +31,5 @@ return [
         return 0;
     },
 ];
+
+return $command;

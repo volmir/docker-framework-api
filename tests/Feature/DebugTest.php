@@ -82,6 +82,28 @@ final class DebugTest extends DatabaseTestCase
         self::assertSame([], QueryLog::$queries, 'Each request starts a new counter');
     }
 
+    public function test_all_connection_helpers_are_counted_in_server_timing_without_parameter_values(): void
+    {
+        $_ENV['APP_DEBUG'] = '1';
+        $connection = new Connection();
+        $connection->pdo()->beginTransaction();
+        $email = 'helper-trace@example.com';
+        try {
+            $response = $this->runDebug(static function () use ($connection, $email): Response {
+                self::assertSame(1, $connection->run('INSERT INTO users (email, password_hash) VALUES (?, ?)', [$email, 'trace-secret']));
+                self::assertSame(['email' => $email], $connection->one('SELECT email FROM users WHERE email = :email', ['email' => $email]));
+                self::assertSame([['email' => $email]], $connection->all('SELECT email FROM users WHERE email = ?', [$email]));
+                return Response::noContent();
+            });
+            self::assertSame('3', $response->headers['X-Debug-Queries']);
+            self::assertStringContainsString('desc="3 queries"', $response->headers['Server-Timing']);
+            self::assertCount(3, QueryLog::$queries);
+            $log = json_encode(QueryLog::$queries, JSON_THROW_ON_ERROR);
+            self::assertStringNotContainsString($email, $log);
+            self::assertStringNotContainsString('trace-secret', $log);
+        } finally { $connection->pdo()->rollBack(); }
+    }
+
     public function test_application_routes_report_the_actual_number_of_queries(): void
     {
         $_ENV['APP_DEBUG'] = '1';

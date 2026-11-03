@@ -3,15 +3,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit;
 
+use App\Console\Console;
 use App\Controller\HealthController;
 use App\Http\Middleware;
 use App\Middleware\ApiKeyAuth;
 use App\Middleware\ErrorHandler;
 use PHPUnit\Framework\TestCase;
-use function App\Console\routeKeys;
-use function App\Console\routesTable;
-
-require_once __DIR__ . '/../../src/Console/routes.php';
 
 final class RoutesTest extends TestCase
 {
@@ -24,7 +21,7 @@ final class RoutesTest extends TestCase
             'GET /duplicate' => [HealthController::class, 'index'],
             'GET /valid' => [HealthController::class, 'index', [ApiKeyAuth::class]],
         ];
-        $result = routesTable($routes, [ErrorHandler::class], true, [...array_keys($routes), 'GET /duplicate']);
+        $result = Console::routesTable($routes, [ErrorHandler::class], true, [...array_keys($routes), 'GET /duplicate']);
 
         self::assertSame([
             'GET /missing: controller class does not exist: App\\Controller\\MissingController',
@@ -39,7 +36,7 @@ final class RoutesTest extends TestCase
 
     public function test_invalid_global_middleware_are_reported_and_mark_every_route(): void
     {
-        $result = routesTable(['GET /health' => [HealthController::class, 'index']],
+        $result = Console::routesTable(['GET /health' => [HealthController::class, 'index']],
             ['MissingGlobal', HealthController::class], true);
 
         self::assertSame([
@@ -51,7 +48,7 @@ final class RoutesTest extends TestCase
 
     public function test_listing_does_not_validate_classes_without_check(): void
     {
-        $result = routesTable(['GET /missing' => ['MissingController', 'index', ['MissingMiddleware']]], ['MissingGlobal']);
+        $result = Console::routesTable(['GET /missing' => ['MissingController', 'index', ['MissingMiddleware']]], ['MissingGlobal']);
 
         self::assertSame([], $result['errors']);
         self::assertStringContainsString('MissingController@index', $result['output']);
@@ -60,7 +57,7 @@ final class RoutesTest extends TestCase
 
     public function test_utf8_columns_follow_the_longest_cell_and_preserve_route_order(): void
     {
-        $result = routesTable([
+        $result = Console::routesTable([
             'GET /пользователи' => ['Пример\\Контроллер', 'список'],
             'POST /a' => [HealthController::class, 'index', [ApiKeyAuth::class, ErrorHandler::class]],
         ], [ErrorHandler::class]);
@@ -92,7 +89,7 @@ return [
     "GET /\x6fther" => [Example::class, 'index'],
 ];
 PHP;
-        self::assertSame(['GET /same', 'GET /same', 'GET /other', 'GET /other'], routeKeys($source));
-        self::assertSame([], routeKeys('<?php return [];'));
+        self::assertSame(['GET /same', 'GET /same', 'GET /other', 'GET /other'], Console::routeKeys($source));
+        self::assertSame([], Console::routeKeys('<?php return [];'));
     }
 }

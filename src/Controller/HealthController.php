@@ -17,7 +17,7 @@ final class HealthController
     public function index(Request $request): Response
     {
         try {
-            $this->connection->pdo()->query('SELECT 1');
+            $this->connection->one('SELECT 1');
         } catch (Throwable) {
             return Response::json(['status' => 'down'], 503);
         }

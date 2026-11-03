@@ -13,6 +13,11 @@ no DI container, ORM, dotenv parser or hidden application bootstrap.
 Application PHP files use strict_types=1 and final classes. Composer PSR-4 maps
 `App\` to `src/`; tests use `App\Tests\` mapped to `tests/`.
 
+## Architecture
+
+See [Architecture](docs/architecture.md) for domain ownership and dependency rules, and [Layers are earned, not assumed](docs/decisions.md#layers-are-earned-not-assumed) for when shared logic, readonly DTOs and additional layers are justified.
+Choose where auxiliary functions belong using the [Helpers rules](docs/architecture.md#helpers).
+
 ## Requirements
 
 Docker Engine or Docker Desktop with Docker Compose v2. The documented `make`
@@ -78,18 +83,24 @@ tree -a --noreport -I '.git|vendor|.env|.phpunit.cache|.idea|.vscode|.agents|.aw
 ├── LICENSE
 ├── Makefile
 ├── README.md
+├── SECURITY.md
 ├── bin
 │   └── console
 ├── commands
 │   ├── apikey-generate.php
 │   ├── env-check.php
 │   ├── make_command.php
+│   ├── make_controller.php
+│   ├── make_domain.php
+│   ├── make_middleware.php
 │   ├── make_migration.php
 │   ├── migrate.php
 │   ├── rollback.php
 │   ├── routes.php
 │   ├── seed.php
-│   └── status.php
+│   ├── status.php
+│   ├── users-create.php
+│   └── users-list.php
 ├── compose.override.yaml
 ├── compose.yaml
 ├── composer.json
@@ -100,6 +111,7 @@ tree -a --noreport -I '.git|vendor|.env|.phpunit.cache|.idea|.vscode|.agents|.aw
 │   └── seeds
 │       └── users.php
 ├── docs
+│   ├── architecture.md
 │   ├── cookbook.md
 │   ├── decisions.md
 │   └── requests.http
@@ -111,7 +123,7 @@ tree -a --noreport -I '.git|vendor|.env|.phpunit.cache|.idea|.vscode|.agents|.aw
 │   ├── Config.php
 │   ├── Console
 │   │   ├── Console.php
-│   │   └── routes.php
+│   │   └── Generator.php
 │   ├── Controller
 │   │   ├── HealthController.php
 │   │   └── UserController.php
@@ -141,9 +153,14 @@ tree -a --noreport -I '.git|vendor|.env|.phpunit.cache|.idea|.vscode|.agents|.aw
 │   │   ├── ErrorHandler.php
 │   │   ├── RequestId.php
 │   │   └── RequireJson.php
+│   ├── Users
+│   │   ├── EmailTaken.php
+│   │   └── Users.php
 │   ├── middleware.php
 │   └── routes.php
 └── tests
+    ├── Architecture
+    │   └── DependencyRulesTest.php
     ├── DatabaseTestCase.php
     ├── Feature
     │   ├── .gitkeep
@@ -155,21 +172,26 @@ tree -a --noreport -I '.git|vendor|.env|.phpunit.cache|.idea|.vscode|.agents|.aw
     │   ├── MigratorTest.php
     │   ├── RouterTest.php
     │   ├── RoutesCommandTest.php
+    │   ├── ScaffoldingTest.php
     │   ├── SeederTest.php
     │   ├── StartupTest.php
+    │   ├── TransactionTest.php
     │   └── UserControllerTest.php
     ├── Fixtures
     │   └── InputStream.php
-    └── Unit
-        ├── .gitkeep
-        ├── ConfigTest.php
-        ├── ErrorsTest.php
-        ├── MiddlewareTest.php
-        ├── PipelineTest.php
-        ├── RequestTest.php
-        ├── ResponseTest.php
-        ├── RoutesTest.php
-        └── ValidatorTest.php
+    ├── Unit
+    │   ├── .gitkeep
+    │   ├── ConfigTest.php
+    │   ├── ErrorsTest.php
+    │   ├── MiddlewareTest.php
+    │   ├── PipelineTest.php
+    │   ├── RequestTest.php
+    │   ├── ResponseTest.php
+    │   ├── RoutesTest.php
+    │   └── ValidatorTest.php
+    └── Users
+        ├── CommandsTest.php
+        └── UsersTest.php
 ```
 <!-- PROJECT_TREE_END -->
 
@@ -316,6 +338,8 @@ Argon2id password hashes.
 
 ## Routes
 
+Routes use exact method/path matching without placeholders; see [the routing decision](docs/decisions.md#exact-match-routing-no-path-placeholders) for the rationale and tradeoffs.
+
 | Method and path | Middleware | Result |
 | --- | --- | --- |
 | `GET /health` | Public | 200 `{"status":"ok"}`; 503 `{"status":"down"}` if SELECT 1 fails. |
@@ -423,21 +447,42 @@ file generators and key generation work without a database connection.
 | `seed [name] [--force]` | Run all seeders or one snake_case name; production requires --force. |
 | `apikey:generate <client>` | Display a random 32-byte hex key once and a ready client:hash entry; stores neither. |
 | `env:check` | Run Config::boot() without a database; exit 1 with the same missing or unsafe variable names as startup. |
+| `users:create <email>` | Create a user through Users; password is read without terminal echo or from STDIN, never from arguments. Prints the public user as JSON. |
+| `users:list [--limit=20]` | List public users as JSON, with a validated limit of 1–100. |
 | `routes [--check]` | Show global middleware and an aligned METHOD / PATH / HANDLER / MIDDLEWARE table in route file order; --check reports configuration errors and exits 1. |
 | `make:migration <name>` | Generate database/migrations/YYYYMMDDHHMMSS_name.php with empty up/down; name matches `[a-z][a-z0-9_]*`. |
 | `make:command <name>` | Generate commands/name.php, replacing `:` with `_`; name is action or group:action, matching `[a-z][a-z0-9]*(:[a-z][a-z0-9_]*)?`. |
+| `make:controller <Name> [action ...]` | Generate src/Controller/NameController.php; default action is index. Accepts StudlyCase or snake_case and removes a trailing Controller suffix; prints routes for manual registration. |
+| `make:middleware <Name>` | Generate src/Middleware/Name.php; requires StudlyCase and prints global/per-route registration hints. |
+| `make:domain <Name>` | Generate src/Name/Name.php and tests/Name/NameTest.php; use a meaningful plural StudlyCase name such as Posts, without Service/Repository/Manager suffixes. Prints a migration hint. |
 
 Generators print the relative path, create files with mode `0644`, and never
 overwrite existing files. Migrations use UTC timestamps; if the newest existing
 timestamp is at or ahead of the current time, the next timestamp is one second
 later. A migration name may only be generated once, regardless of timestamp.
 Command generation rejects already registered names, including `list` and `help`.
-Both generators exit 1 in production or when the destination is not writable;
-use the development bind mount via `make migration name=create_posts_table` or
-`make command name=report:users`. The dev container runs as UID/GID `1000:1000`;
-compare `id` on the host with `docker compose run --rm --no-deps php id` if file
-ownership differs. See the [migration](docs/cookbook.md#add-a-migration) and
-[command](docs/cookbook.md#add-a-console-command) recipes.
+All generators exit 1 in production or when the destination is not writable;
+new directories use mode `0755`. Use the development bind mount through the Make
+targets below; they explicitly run as the host's UID/GID so generated files belong
+to the invoking user. Direct container commands use the image's default UID/GID
+`1000:1000`. See the [endpoint](docs/cookbook.md#add-an-endpoint),
+[middleware](docs/cookbook.md#write-a-middleware), [migration](docs/cookbook.md#add-a-migration)
+and [command](docs/cookbook.md#add-a-console-command) recipes.
+`make:domain` checks both destination files before writing either and removes its
+new class file if writing the test fails. Plural meaning is chosen by the developer;
+the generator validates syntax and naming suffixes, without guessing grammar.
+Names reserved by the application's infrastructure and test suites are rejected.
+
+Controller actions must match `[a-z][A-Za-z0-9]*` and be unique ignoring case.
+The suggested path is the snake_case class name plus `s` (`BlogPost` becomes
+`/blog_posts`). Index/show use GET, create uses POST, update uses PATCH, delete uses
+DELETE, and other actions use GET with the action appended to the path. Show uses
+`/<resource>/show` with query parameters. All suggested routes include ApiKeyAuth;
+POST/PATCH suggestions also include RequireJson. Generators never edit
+`src/routes.php` or `src/middleware.php`. They provide only a working skeleton;
+developers add validation and SQL, using `UserController` as a working example.
+The scaffold accepts `Connection $_connection` as Router requires, without storing
+an unused property; promote it to a property when adding SQL.
 
 `routes` reads `src/routes.php` and `src/middleware.php` without constructing
 controllers or middleware or opening the database. `--check` verifies controller
@@ -454,6 +499,13 @@ MySQL advisory lock with a five-second wait. Rollback deletes each tracking row
 immediately after its successful `down`. Seeder files use `snake_case.php` and a
 callable `run`. Files and callable shapes are validated before execution.
 
+`Connection::one()` returns a row or null, `all()` a list, and `run()` affected rows; all bind typed parameters through prepared statements (see [database queries](docs/cookbook.md#query-the-database)).
+
+`Connection::transaction($fn)` passes the same Connection to the callback, commits
+and returns its result, or rolls back an active transaction and rethrows the same
+Throwable. Existing transactions are rejected with LogicException; there are no
+nested transactions or savepoints. It uses `pdo()` in both normal and debug mode.
+
 | Make target | Behavior |
 | --- | --- |
 | `help` | Show shortcuts; works without .env. |
@@ -463,12 +515,15 @@ callable `run`. Files and callable shapes are validated before execution.
 | `migrate` / `status` | Invoke database commands. |
 | `migration name=create_posts_table` | Generate an empty migration in the dev PHP container. |
 | `command name=report:users` | Generate a console command in the dev PHP container. |
+| `controller name=Post actions="index show"` | Generate a controller in dev and print protected routes to add manually. |
+| `middleware name=Throttle` | Generate pass-through middleware in dev and print registration hints. |
+| `domain name=Posts` | Generate a domain and its DatabaseTestCase constructor test in dev; print a migration hint. |
 | `routes` / `routes-check` | Show routes / run routes --check in a disposable PHP container without starting MySQL. |
 | `rollback ARGS="2"` | Roll back two batches. |
 | `seed ARGS="users"` | Run the users seed. |
 | `fresh` | Delete volumes, start, migrate and seed; destroys the database. |
 | `test` / `lint` | Build/run the test profile / check PHP syntax. |
-| `analyse` / `check` | Run PHPStan level 8 / run lint, analysis, tests and routes --check. |
+| `analyse` / `check` | Run PHPStan level 8 / run lint, analysis, routes --check and tests in order. |
 | `prod-check` | Run env:check in a disposable PHP container with APP_ENV=production and no database dependency. |
 
 Every Docker Make target requires `.env` and reports `cp .env.example .env` if
@@ -477,7 +532,7 @@ it is missing. Add `--force` through ARGS when required, for example
 
 ## Tests
 
-Run `make analyse` for PHPStan level 8 in the tests container, or `make check` for lint, analysis, tests and route configuration validation together.
+Run `make analyse` for PHPStan level 8 in Docker (`composer analyse` inside the container). The analysis covers `src`, `bin`, `public`, `commands`, `database` and `tests`; all new code must pass level 8 without a baseline or `ignoreErrors`. Run `make check` to execute lint, analysis, `routes --check` and tests in order with one exit code; it stops at the first failure, including with `make -j check`.
 
 ```sh
 make test
@@ -491,6 +546,9 @@ middleware, early error registration, fatal shutdowns and secret redaction.
 Feature tests pass Request through Router/Pipeline into Response,
 without an HTTP server. All database tests use real MySQL, never SQLite.
 `phpunit.xml` forces APP_ENV and DB settings to the isolated `db-test` service.
+The Domains suite discovers `tests/<Domain>/*Test.php` automatically, including
+generated constructor tests; Unit, Feature, Architecture and Fixtures are excluded
+from that suite so existing tests are not run twice.
 Its data directory is tmpfs and it has separate credentials and no host port.
 
 `DatabaseTestCase` applies migrations and opens a transaction before each test;
@@ -507,6 +565,8 @@ docker compose exec -T php sh -c 'find commands database -name "*.php" -print0 |
 ```
 
 ## Production
+
+See [SECURITY.md](SECURITY.md) for secret handling, key rotation, network exposure, HTTPS requirements and vulnerability reporting.
 
 There is one `.env.example` and one local `.env`; no separate production env
 file is used. Set `APP_ENV=production`, `APP_DEBUG=0`, new database passwords,
@@ -568,7 +628,7 @@ support; it compiles pdo_mysql. No ORM, PSR logger package or dotenv library is 
   currently has the same access to protected routes. There is no
   login, per-user authorization, key expiry, password reset, update or delete API.
 - Routes match exact methods and paths. Parameters use query strings; there are
-  no placeholders, implicit HEAD handling, route groups or command scaffolding.
+  no placeholders, implicit HEAD handling or route groups.
 - Input is JSON objects only, capped at 1 MiB. There is no form/file-upload API,
   streaming response API or schema validation package. Pagination has no total
   count or cursor; large offsets and unindexed new queries need separate care.

@@ -1,6 +1,6 @@
 COMPOSE = docker compose
 
-.PHONY: help check-env install up down logs sh migrate rollback status seed routes routes-check migration command fresh test lint analyse check prod-check
+.PHONY: help check-env install up down logs sh migrate rollback status seed routes routes-check migration command controller middleware domain fresh test lint analyse check prod-check
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -40,10 +40,19 @@ routes-check: check-env ## Check route classes, methods, middleware and duplicat
 	$(COMPOSE) run --rm --no-deps php php bin/console routes --check
 
 migration: check-env ## Generate a migration: make migration name=create_posts_table
-	$(COMPOSE) run --rm --no-deps php php bin/console make:migration "$(name)"
+	$(COMPOSE) run --rm --no-deps --user "$$(id -u):$$(id -g)" php php bin/console make:migration "$(name)"
 
 command: check-env ## Generate a console command: make command name=report:users
-	$(COMPOSE) run --rm --no-deps php php bin/console make:command "$(name)"
+	$(COMPOSE) run --rm --no-deps --user "$$(id -u):$$(id -g)" php php bin/console make:command "$(name)"
+
+controller: check-env ## Generate a controller: make controller name=Post actions="index show"
+	$(COMPOSE) run --rm --no-deps --user "$$(id -u):$$(id -g)" php php bin/console make:controller "$(name)" $(actions)
+
+middleware: check-env ## Generate middleware: make middleware name=Throttle
+	$(COMPOSE) run --rm --no-deps --user "$$(id -u):$$(id -g)" php php bin/console make:middleware "$(name)"
+
+domain: check-env ## Generate a domain and its test: make domain name=Posts
+	$(COMPOSE) run --rm --no-deps --user "$$(id -u):$$(id -g)" php php bin/console make:domain "$(name)"
 
 prod-check: check-env ## Check production environment safety without starting the database
 	$(COMPOSE) run --rm --no-deps -e APP_ENV=production php php bin/console env:check
@@ -69,4 +78,8 @@ analyse: check-env ## Run PHPStan level 8 inside the test container
 	$(COMPOSE) --profile test build tests
 	$(COMPOSE) --profile test run --rm --no-deps tests composer analyse
 
-check: lint analyse test routes-check ## Run syntax checks, static analysis, tests and route validation
+check: ## Run lint, static analysis, route validation and tests in order
+	$(MAKE) lint
+	$(MAKE) analyse
+	$(MAKE) routes-check
+	$(MAKE) test

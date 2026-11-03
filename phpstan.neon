@@ -5,5 +5,7 @@ parameters:
         - bin
         - bin/console # The entrypoint has no .php extension.
         - public
+        - commands
+        - database
         - tests
     tmpDir: /tmp/phpstan

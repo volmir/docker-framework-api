@@ -63,9 +63,8 @@ final class RoutesCommandTest extends TestCase
     {
         $directory = sys_get_temp_dir() . '/routes-command-' . bin2hex(random_bytes(6));
         mkdir($directory . '/commands', 0777, true);
-        mkdir($directory . '/src/Console', 0777, true);
+        mkdir($directory . '/src', 0777, true);
         copy(__DIR__ . '/../../commands/routes.php', $directory . '/commands/routes.php');
-        symlink(__DIR__ . '/../../src/Console/routes.php', $directory . '/src/Console/routes.php');
         file_put_contents($directory . '/src/middleware.php', '<?php return [App\\Middleware\\ErrorHandler::class];');
         file_put_contents($directory . '/src/routes.php', <<<'PHP'
 <?php
@@ -90,10 +89,10 @@ PHP);
             self::assertStringContainsString('GET /typo: controller class does not exist: App\\Controller\\TypoController', $output);
             self::assertStringContainsString('GET /duplicate: duplicate route key', $output);
         } finally {
-            foreach (['commands/routes.php', 'src/Console/routes.php', 'src/routes.php', 'src/middleware.php'] as $file) {
+            foreach (['commands/routes.php', 'src/routes.php', 'src/middleware.php'] as $file) {
                 unlink($directory . '/' . $file);
             }
-            foreach (['src/Console', 'src', 'commands', ''] as $path) { rmdir($directory . '/' . $path); }
+            foreach (['src', 'commands', ''] as $path) { rmdir($directory . '/' . $path); }
         }
     }
 }
