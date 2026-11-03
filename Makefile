@@ -1,4 +1,5 @@
 COMPOSE = docker compose
+TEST_VERBOSE ?= 0
 
 .PHONY: help check-env install up down restart logs sh migrate rollback status seed routes routes-check migration command controller middleware domain fresh test lint analyse check prod-check
 
@@ -70,8 +71,8 @@ fresh: check-env ## Recreate the database, migrate and seed
 	$(MAKE) seed
 
 test: check-env ## Run PHPUnit against the isolated test environment
-	$(COMPOSE) --profile test build tests
-	$(COMPOSE) --profile test run --rm tests
+	@$(COMPOSE) --progress quiet --profile test build --quiet tests
+	@$(COMPOSE) --progress quiet --profile test run --rm -e TEST_VERBOSE="$(TEST_VERBOSE)" tests
 
 lint: check-env ## Check PHP syntax inside the container
 	$(COMPOSE) run --rm --no-deps php composer lint

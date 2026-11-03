@@ -52,7 +52,19 @@ PHP);
 
     public function test_missing_command_returns_one(): void
     {
-        self::assertSame(1, (new Console($this->commandsDir, $this->connection))->run(['console', 'missing']));
+        $autoload = var_export(dirname(__DIR__, 2) . '/vendor/autoload.php', true);
+        $directory = var_export($this->commandsDir, true);
+        $script = "require {$autoload}; exit((new App\\Console\\Console({$directory}, new App\\Database\\Connection()))->run(['console', 'missing']));";
+        $process = proc_open([PHP_BINARY, '-r', $script], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        self::assertIsResource($process);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        self::assertSame(1, proc_close($process));
+        self::assertSame("Command not found: missing\n", $stderr);
+        self::assertSame("Available commands:\n  first           First test command\n  second          Second test command\n", $stdout);
     }
 
     public function test_no_command_prints_the_list(): void

@@ -40,4 +40,4 @@ COPY --chown=app:app composer.json composer.lock ./
 COPY --chown=app:app src/ ./src/
 RUN composer install --no-interaction --no-progress
 COPY --chown=app:app . .
-CMD ["composer", "test"]
+CMD ["sh", "bin/test"]

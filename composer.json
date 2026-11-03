@@ -23,7 +23,7 @@
         "ext-json": "*"
     },
     "scripts": {
-        "test": "phpunit",
+        "test": "sh bin/test",
         "lint": "find src bin public commands database tests -name '*.php' -print0 | xargs -0 -n1 php -l",
         "analyse": "phpstan analyse --memory-limit=256M"
     }

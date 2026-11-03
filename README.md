@@ -558,10 +558,18 @@ Run `make analyse` for PHPStan level 8 in Docker (`composer analyse` inside the 
 
 ```sh
 make test
+make test TEST_VERBOSE=1 # Include application stderr while tests run
 make lint
 docker compose --profile test run --rm tests vendor/bin/phpunit --order-by=random --random-order-seed=20261102
 docker compose --profile test run --rm tests vendor/bin/phpunit --order-by=reverse
 ```
+
+`make test` keeps PHPUnit progress and results visible and suppresses Docker
+progress messages. The test runner captures application stderr in a temporary
+file, prints it if PHPUnit exits with a nonzero status, and removes the file.
+Use `make test TEST_VERBOSE=1` to stream all logs, or `sh bin/test --filter Name`
+inside the test container to run selected tests. The container invokes PHPUnit
+directly, avoiding Composer's root-version warning during test execution.
 
 Unit tests cover configuration, request parsing, responses, pipeline order and
 middleware, early error registration, fatal shutdowns and secret redaction.

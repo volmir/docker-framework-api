@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+if [ "${TEST_VERBOSE:-0}" = 1 ]; then
+    exec php vendor/bin/phpunit "$@"
+fi
+
+# Keep PHPUnit progress visible; replay application stderr if the run fails.
+test_log=$(mktemp)
+trap 'rm -f "$test_log"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+test_status=0
+php vendor/bin/phpunit "$@" 2>"$test_log" || test_status=$?
+if [ "$test_status" -ne 0 ]; then
+    cat "$test_log" >&2
+fi
+exit "$test_status"

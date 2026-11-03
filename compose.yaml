@@ -114,7 +114,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=128m,uid=1000,gid=1000,mode=1770
-    command: [composer, test]
+    command: [sh, bin/test]
 
 volumes:
   db_data:
