@@ -45,8 +45,8 @@ migration: check-env ## Generate a migration: make migration name=create_posts_t
 command: check-env ## Generate a console command: make command name=report:users
 	$(COMPOSE) run --rm --no-deps --user "$$(id -u):$$(id -g)" php php bin/console make:command "$(name)"
 
-controller: check-env ## Generate a controller: make controller name=Post actions="index show"
-	$(COMPOSE) run --rm --no-deps --user "$$(id -u):$$(id -g)" php php bin/console make:controller "$(name)" $(actions)
+controller: check-env ## Generate a controller: make controller name=Post actions="index show" routes=1
+	$(COMPOSE) run --rm --no-deps --user "$$(id -u):$$(id -g)" php php bin/console make:controller "$(name)" $(actions) $(if $(filter 1,$(routes)),--routes,)
 
 middleware: check-env ## Generate middleware: make middleware name=Throttle
 	$(COMPOSE) run --rm --no-deps --user "$$(id -u):$$(id -g)" php php bin/console make:middleware "$(name)"

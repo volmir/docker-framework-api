@@ -92,6 +92,112 @@ final class ScaffoldingTest extends TestCase
         }
     }
 
+    public function test_controller_routes_are_inserted_with_qualified_names_and_pass_route_check(): void
+    {
+        $file = $this->routeFixture();
+        chmod($file, 0640);
+        $owner = fileowner($file); $group = filegroup($file);
+        $this->generate('controller', ['RegisteredPost', 'index', 'show', 'create', '--routes']);
+        $source = file_get_contents($file);
+        self::assertIsString($source);
+        self::assertStringContainsString("    'GET /registered_posts' => [\\App\\Controller\\RegisteredPostController::class, 'index', [\\App\\Middleware\\ApiKeyAuth::class]],\n    'GET /registered_posts/show'", $source);
+        self::assertStringContainsString('[\\App\\Middleware\\ApiKeyAuth::class, \\App\\Middleware\\RequireJson::class]', $source);
+        self::assertSame(1, substr_count($source, '    // make:controller: new routes are inserted above this line'));
+        clearstatcache();
+        self::assertSame(0640, fileperms($file) & 07777);
+        self::assertSame($owner, fileowner($file)); self::assertSame($group, filegroup($file));
+        require $this->directory . '/src/Controller/RegisteredPostController.php';
+        copy(__DIR__ . '/../../commands/routes.php', $this->directory . '/commands/routes.php');
+        file_put_contents($this->directory . '/src/middleware.php', '<?php return [];');
+        $command = require $this->directory . '/commands/routes.php';
+        ob_start();
+        try { self::assertSame(0, $command['execute'](['--check'], new Connection())); }
+        finally { ob_end_clean(); }
+        self::assertSame(['RegisteredPostController.php'], array_map('basename', glob($this->directory . '/src/Controller/*') ?: []));
+        self::assertSame(['Controller', 'middleware.php', 'routes.php'], array_map('basename', glob($this->directory . '/src/*') ?: []));
+    }
+
+    public function test_controller_routes_skip_duplicates_and_can_be_run_again_without_overwriting(): void
+    {
+        $file = $this->routeFixture("    'GET /repeat_posts' => [\\App\\Controller\\HealthController::class, 'index'],\n");
+        $output = $this->generate('controller', ['RepeatPost', 'index', 'show', '--routes']);
+        self::assertStringContainsString('Skipping existing route: GET /repeat_posts', $output);
+        $source = file_get_contents($file);
+        self::assertIsString($source);
+        self::assertSame(1, substr_count($source, "'GET /repeat_posts'"));
+        self::assertStringContainsString("'GET /repeat_posts/show'", $source);
+        $controller = file_get_contents($this->directory . '/src/Controller/RepeatPostController.php');
+        require $this->directory . '/src/Controller/RepeatPostController.php';
+        $output = $this->generate('controller', ['RepeatPost', 'index', 'show', '--routes']);
+        self::assertSame(2, substr_count($output, 'Skipping existing route:'));
+        self::assertSame($source, file_get_contents($file));
+        self::assertSame($controller, file_get_contents($this->directory . '/src/Controller/RepeatPostController.php'));
+        $this->reject('controller', ['RepeatPost', 'delete', '--routes'], 'missing a requested action');
+        self::assertSame($source, file_get_contents($file));
+        self::assertSame($controller, file_get_contents($this->directory . '/src/Controller/RepeatPostController.php'));
+    }
+
+    public function test_controller_routes_require_the_exact_marker_and_print_manual_routes_on_refusal(): void
+    {
+        $file = $this->routeFixture();
+        $source = str_replace('    // make:controller:', '   // make:controller:', file_get_contents($file) ?: '');
+        file_put_contents($file, $source);
+        $command = require $this->directory . '/commands/make_controller.php';
+        ob_start();
+        try {
+            try { $command['execute'](['MissingMarker', '--routes'], new Connection()); self::fail('Expected refusal'); }
+            catch (RuntimeException $error) { self::assertStringContainsString('marker', $error->getMessage()); }
+            $output = ob_get_contents(); self::assertIsString($output);
+        } finally { ob_end_clean(); }
+        self::assertStringContainsString("'GET /missing_markers'", $output);
+        self::assertSame($source, file_get_contents($file));
+        self::assertFileDoesNotExist($this->directory . '/src/Controller/MissingMarkerController.php');
+    }
+
+    public function test_controller_routes_roll_back_a_lint_failure_and_a_failed_table_reload(): void
+    {
+        foreach ([
+            'LintRollback' => "<?php\n    // make:controller: new routes are inserted above this line\nreturn [];\n",
+            'LoadRollback' => "<?php\n\$routes = [\n    // make:controller: new routes are inserted above this line\n];\nif (\$routes !== []) { throw new RuntimeException('Reload refused'); }\nreturn \$routes;\n",
+            'MarkerInComment' => "<?php\n/*\n    // make:controller: new routes are inserted above this line\n*/\nreturn [];\n",
+        ] as $name => $source) {
+            $file = $this->routeFixture(); file_put_contents($file, $source); chmod($file, 0640);
+            $owner = fileowner($file); $group = filegroup($file);
+            $this->reject('controller', [$name, '--routes'], match ($name) { 'LintRollback' => 'lint failed', 'LoadRollback' => 'Reload refused', default => 'did not load inserted routes' });
+            clearstatcache();
+            self::assertSame($source, file_get_contents($file));
+            self::assertSame(0640, fileperms($file) & 07777);
+            self::assertSame($owner, fileowner($file)); self::assertSame($group, filegroup($file));
+            self::assertFileDoesNotExist($this->directory . '/src/Controller/' . $name . 'Controller.php');
+            self::assertSame(['routes.php'], array_map('basename', glob($this->directory . '/src/*') ?: []));
+            self::assertSame([], glob($this->directory . '/src/.routes-*'));
+        }
+    }
+
+    public function test_controller_routes_refuse_production_and_roll_back_when_controller_cannot_be_written(): void
+    {
+        $file = $this->routeFixture(); $source = file_get_contents($file);
+        $_ENV['APP_ENV'] = 'production';
+        $this->reject('controller', ['ProductionRoute', '--routes'], 'disabled in production');
+        $_ENV['APP_ENV'] = 'test';
+        self::assertSame($source, file_get_contents($file));
+        self::assertDirectoryDoesNotExist($this->directory . '/src/Controller');
+        mkdir($this->directory . '/src/Controller', 0555);
+        try { $this->reject('controller', ['UnwritableRoute', '--routes'], 'not writable'); }
+        finally { chmod($this->directory . '/src/Controller', 0755); }
+        self::assertSame($source, file_get_contents($file));
+        self::assertSame([], glob($this->directory . '/src/Controller/*'));
+        self::assertSame([], glob($this->directory . '/src/.routes-*'));
+    }
+
+    private function routeFixture(string $entries = ''): string
+    {
+        if (!is_dir($this->directory . '/src')) { mkdir($this->directory . '/src', 0755); }
+        $file = $this->directory . '/src/routes.php';
+        file_put_contents($file, "<?php\nreturn [\n" . $entries . "    // make:controller: new routes are inserted above this line\n];\n");
+        return $file;
+    }
+
     public function test_generated_middleware_implements_the_interface_and_passes_the_same_request_on(): void
     {
         $output = $this->generate('middleware', ['GeneratedPassThrough']);

@@ -13,6 +13,7 @@ $routes = [
     'GET /users' => [UserController::class, 'index', [ApiKeyAuth::class]],
     'GET /users/show' => [UserController::class, 'show', [ApiKeyAuth::class]],
     'POST /users' => [UserController::class, 'create', [ApiKeyAuth::class, RequireJson::class]],
+    // make:controller: new routes are inserted above this line
 ];
 
 return $routes;
