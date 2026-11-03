@@ -4,8 +4,8 @@
 
 `.env` is ignored by Git and excluded from the Docker build context by `.dockerignore`; the dev bind mount still exposes it at runtime.
 On servers, restrict its permissions with `chmod 600 .env`; this is an operator responsibility.
-`API_KEY_HASHES` contains only comma-separated SHA-256 entries in `client:hash` format (64 hexadecimal characters per hash).
-`apikey:generate <client>` prints the plaintext key once and its `client:hash` entry; keep the plaintext in the client's secret store.
+`API_KEYS` contains comma-separated plaintext credentials in `client:key` format. Keys are compared directly and case-sensitively with `hash_equals`; no API-key hashing is performed.
+`apikey:generate <client>` prints one `client:key` entry. Store the whole entry in `.env` API_KEYS and the key part in the client's secret store. Protect `.env` as a credentials file; anyone able to read it can use its API keys.
 Send keys in `X-Api-Key` or `Authorization: Bearer` headers, never in query strings; authentication does not read query keys.
 
 ## Exposure
@@ -18,11 +18,11 @@ Set `APP_ENV=production` and `APP_DEBUG=0`; `Config::assertSafe()` rejects enabl
 
 ## Key rotation
 
-1. Generate a new key for the same client: `docker compose -f compose.yaml exec -T php bin/console apikey:generate <client>`; save its plaintext securely.
-2. Append its `client:hash` entry to `API_KEY_HASHES` in `.env`, separated by a comma; keep the old entry and other clients' entries.
-3. Apply both hashes: `docker compose -f compose.yaml up -d --force-recreate php`.
+1. Generate a new key for the same client: `docker compose -f compose.yaml exec -T php bin/console apikey:generate <client>`; save the key part securely.
+2. Append its `client:key` entry to `API_KEYS` in `.env`, separated by a comma; keep the old entry and other clients' entries.
+3. Apply both keys: `docker compose -f compose.yaml up -d --force-recreate php`.
 4. Switch the client to the new plaintext key and verify it works.
-5. Remove only the old `client:hash` entry from `API_KEY_HASHES`.
+5. Remove only the old `client:key` entry from `API_KEYS`.
 6. Apply the removal: `docker compose -f compose.yaml up -d --force-recreate php`.
 
 If compromised, immediately remove the affected entry and recreate PHP as above; removing the last entry prevents production startup.

@@ -45,8 +45,8 @@ curl -i http://localhost:8082/health
 Expected: HTTP 200 and `{"status":"ok"}`. `make up` builds images and waits for
 healthy containers. The demo seed creates Alice and Bob once, with random,
 undisclosed passwords. Repeating `make seed` preserves existing users and hashes.
-Protected routes initially return 401 because `API_KEY_HASHES` is empty; follow
-the [API key recipe](docs/cookbook.md#rotate-an-api-key) to enable them.
+Protected routes initially return 401 because `API_KEYS` is empty; follow
+the [first API key recipe](docs/cookbook.md#create-your-first-api-key) to enable them.
 
 `docker compose up -d` automatically reads `compose.yaml`, `compose.override.yaml`
 and `.env`. The development override mounts the repository into PHP and exposes
@@ -279,7 +279,7 @@ diagnostics. Both entry points call `Config::boot()` after error registration an
 autoloading, before constructing a Request or accessing the database. It checks
 `Config::REQUIRED` first, then calls `assertSafe()`. Console `list`, `help`, `--help`,
 `-h` and the default command skip boot so help works with an incomplete environment.
-Production rejects enabled/invalid APP_DEBUG, an empty or malformed API_KEY_HASHES list,
+Production rejects enabled/invalid APP_DEBUG, an empty or malformed API_KEYS list,
 empty/example database passwords and wildcard CORS. It reports all affected
 variable names, never their values. local/test do not run those safety checks.
 Changing `.env` requires recreating affected containers, not just restarting them.
@@ -296,7 +296,7 @@ Changing `.env` requires recreating affected containers, not just restarting the
 | `DB_USER` | Yes | `app` | Application user; also `MYSQL_USER` on initial setup. |
 | `DB_PASSWORD` | Yes | `change-me` | Application password; replace it. |
 | `DB_ROOT_PASSWORD` | No (required for safe production) | `change-me-too` | MySQL initialization root password; replace it. |
-| `API_KEY_HASHES` | Yes (may be empty in local/test) | empty | Comma-separated client:sha256hex entries; empty/malformed denies all protected local/test requests and prevents production startup. |
+| `API_KEYS` | Yes (may be empty in local/test) | empty | Comma-separated plaintext client:key entries; empty/malformed denies all protected local/test requests and prevents production startup. |
 | `CORS_ALLOW_ORIGIN` | Yes | `*` | Single Nginx Access-Control-Allow-Origin value; production rejects the wildcard. |
 | `COMPOSE_PROJECT_NAME` | No | `docker_framework_api` | Compose resource and named-volume prefix. |
 | `DB_HOST_PORT` | No | `33306` | Development-only MySQL port bound to 127.0.0.1. |
@@ -333,7 +333,7 @@ with APP_DEBUG=1 includes it in diagnostics. The full list is always in stderr.
 
 MySQL initialization variables apply to a new data directory. Editing credentials
 in `.env` does not update users in an existing database. Data lives in the named
-volume `db_data`; `down -v` deletes it. API key hashes are separate from users'
+volume `db_data`; `down -v` deletes it. API keys are separate from users'
 Argon2id password hashes.
 
 ## Routes
@@ -362,7 +362,7 @@ Argon2id and is never returned. An unsupported creation media type returns 415.
 | ErrorHandler | Preserves HttpException status/code/public details; logs handled exceptions with class, sanitized message, file:line and request_id. Other failures return 500 internal_error. Trace appears only when Config::isDebug() allows it in local/test. |
 | RequestId | Accepts X-Request-Id matching `[A-Za-z0-9-]{8,64}`, or generates 16 random hex characters. Adds an attribute, response header and error.request_id. Errors registers the HTTP ID before request parsing too. |
 | AccessLog | Emits `{ts,request_id,method,path,status,ms}` plus client when authenticated as one JSON line to PHP stderr, including controller failures. Excludes query strings and bodies. |
-| ApiKeyAuth | Accepts X-Api-Key or Bearer authorization; compares SHA-256 against every client:hash entry with hash_equals without early exit, then sets the client request attribute. Missing/invalid keys have the same 401 message and WWW-Authenticate: ApiKey. Empty/malformed configuration denies everyone and logs a warning. |
+| ApiKeyAuth | Accepts X-Api-Key or Bearer authorization; directly compares the plaintext key against every client:key entry with hash_equals without early exit, then sets the client request attribute. Missing/invalid keys have the same 401 message and WWW-Authenticate: ApiKey. Empty/malformed configuration denies everyone and logs a warning. |
 | RequireJson | Requires application/json for POST, PUT and PATCH; otherwise returns 415. |
 
 A nonempty X-Api-Key takes precedence over Authorization. There is no per-user
@@ -386,42 +386,53 @@ OPTIONS and Content-Type, Authorization, X-Api-Key, X-Request-Id.
 
 ## API keys and rotation
 
+For first-time setup, follow [Create your first API key](docs/cookbook.md#create-your-first-api-key):
+generate an entry, put the complete output line in `API_KEYS`, recreate PHP/Nginx,
+then enter the plaintext key at a hidden Bash prompt before using curl.
+Requests to protected routes without a valid key return 401 as expected.
+
 Use `X-Api-Key`, with hyphens. `Authorization: Bearer` is the fallback when that
 header is absent or empty. `X_API_KEY` is not supported: Nginx's default
 `underscores_in_headers off` is retained.
 
-API_KEY_HASHES contains comma-separated `client:sha256hex` entries. Client names
-are case-sensitive, 1–64 ASCII letters/digits/underscores/hyphens, starting with
-a letter or digit. Hashes are exactly 64 hexadecimal characters; the generator
-prints lowercase and the parser also accepts uppercase. Spaces around entries
-are trimmed; an empty entry, trailing comma or any malformed entry invalidates
-the entire list. The previous bare-hash format is no longer accepted.
-One client may appear several times for rotation. Use different credentials for
-different clients; if a hash is assigned to multiple labels, the first matching
-entry supplies the client. Labels do not implement roles or permissions.
-Only `/health` is public in `src/routes.php`; every users route visibly lists
-ApiKeyAuth. `/nginx-health` is infrastructure health served outside the app router.
+API_KEYS contains comma-separated plaintext `client:key` entries. The key is
+compared directly and case-sensitively with `hash_equals`, without hashing or
+normalization. Client names contain 1–64 ASCII letters/digits/underscores/hyphens
+and start with a letter or digit. Keys contain letters/digits/underscores/hyphens;
+`apikey:generate` produces 32 random bytes encoded as 64 hex characters.
+Whitespace around complete entries is trimmed; empty entries, trailing commas,
+missing clients/keys and invalid characters reject the whole list.
+One client may have several keys for rotation. A shared key uses the first
+matching client label; labels do not implement roles or permissions.
+Only `/health` is public in `src/routes.php`; users and generated controller routes
+use ApiKeyAuth. `/nginx-health` is infrastructure health outside the app router.
+
+`API_KEYS` is secret configuration containing plaintext credentials. Keep `.env`
+private and out of Git; see [SECURITY.md](SECURITY.md).
 
 Rotate a mobile key in three steps:
 
-1. Generate and securely save the new plaintext key. The second output line is
-   `mobile:<64-hex-hash>`, ready to add to API_KEY_HASHES; it is not the plaintext key.
+1. Generate a replacement entry and save its key part in the client's secret store:
 
    ```sh
    docker compose exec -T php bin/console apikey:generate mobile
    ```
 
-2. Keep both old and new mobile entries in .env, separated by a comma, preserving
-   other clients' entries. Recreate the containers, update the client, and verify
-   the new key (set API_KEY to its plaintext value in your shell).
+   Output is one `mobile:key` line. Copy the complete line into API_KEYS; send
+   only the part after the colon in request headers.
 
-   ```sh
+2. Keep old and new entries in API_KEYS, separated by a comma, preserving other
+   clients. Recreate the containers, then enter the replacement key in Bash:
+
+   ```bash
    docker compose up -d --force-recreate --wait php nginx
+   read -r -s -p 'API key: ' API_KEY
+   printf '\n'
    curl -i -H "X-Api-Key: $API_KEY" http://localhost:8082/users
    ```
 
-3. Remove only the old mobile entry, recreate again, and check that the old key
-   returns 401 while the new key and other clients still work.
+3. Remove only the old entry and recreate again. Verify the old key returns 401
+   while the replacement and other clients still work:
 
    ```sh
    docker compose up -d --force-recreate --wait php nginx
@@ -445,7 +456,7 @@ file generators and key generation work without a database connection.
 | `status` | Read applied/pending status; does not create the migrations table. |
 | `rollback [batches] [--force]` | Undo latest batches, default one; production requires --force. |
 | `seed [name] [--force]` | Run all seeders or one snake_case name; production requires --force. |
-| `apikey:generate <client>` | Display a random 32-byte hex key once and a ready client:hash entry; stores neither. |
+| `apikey:generate <client>` | Print one plaintext client:key entry with a random 32-byte hex key; does not edit .env. |
 | `env:check` | Run Config::boot() without a database; exit 1 with the same missing or unsafe variable names as startup. |
 | `users:create <email>` | Create a user through Users; password is read without terminal echo or from STDIN, never from arguments. Prints the public user as JSON. |
 | `users:list [--limit=20]` | List public users as JSON, with a validated limit of 1–100. |
@@ -521,6 +532,7 @@ nested transactions or savepoints. It uses `pdo()` in both normal and debug mode
 | `help` | Show shortcuts; works without .env. |
 | `install` | Build PHP and run composer install in a disposable container. |
 | `up` / `down` | Build/start and wait for health / stop the stack, including test services. |
+| `restart` | Recreate/start MySQL, PHP and Nginx with the current .env and wait for health; preserve database volumes. |
 | `logs` / `sh` | Follow logs / open a PHP shell. |
 | `migrate` / `status` | Invoke database commands. |
 | `migration name=create_posts_table` | Generate an empty migration in the dev PHP container. |
@@ -580,7 +592,7 @@ See [SECURITY.md](SECURITY.md) for secret handling, key rotation, network exposu
 
 There is one `.env.example` and one local `.env`; no separate production env
 file is used. Set `APP_ENV=production`, `APP_DEBUG=0`, new database passwords,
-API key hashes and a non-wildcard CORS origin in `.env` before creating the
+plaintext API keys and a non-wildcard CORS origin in `.env` before creating the
 production database. If you need the first API key while production settings
 are still incomplete, generate it in a disposable container without HTTP ports:
 
@@ -588,8 +600,8 @@ are still incomplete, generate it in a disposable container without HTTP ports:
 docker compose -f compose.yaml run --rm --no-deps -e APP_ENV=local php bin/console apikey:generate mobile
 ```
 
-Build the prod image first if it is not present, and save only the printed hash
-in .env. Every CLI command except help/list is gated by startup checks.
+Build the prod image first if it is not present, and save the complete printed client:key entry
+in API_KEYS in .env. Every CLI command except help/list is gated by startup checks.
 `env:check` reports the same failures as startup.
 Run `make prod-check` after dependencies/images are available and before deployment;
 it forces production even when .env currently selects local. On failure, the PHP

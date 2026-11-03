@@ -6,32 +6,100 @@ to add to your application, not additional routes shipped in the repository.
 Try them on a disposable development database. Complete the notes migration
 before calling the notes endpoint, seed or command.
 
-## Add an endpoint
+## Start, stop or restart the service
 
-Console syntax: `make:controller <Name> [action ...] [--routes]`.
-The optional Make parameter `routes=1` forwards `--routes`:
+Run these complete commands in the host terminal from the repository root:
 
 ```sh
-make controller name=Post actions="index show" routes=1
+make up
+make down
+make restart
 ```
 
-Omit `routes=1` (or `--routes`) to print route entries for manual registration.
+`make up` builds/starts MySQL, PHP and Nginx and waits for healthy services.
+`make down` stops and removes the stack's containers, including test-profile
+containers; named database volumes remain. `make restart` recreates/starts the
+whole application stack with the current `.env` and waits for health. It also
+works after `make down`, preserving the existing database volume.
+Use `make up` to rebuild images after Dockerfile changes. `make fresh` removes
+database volumes and is intended for a disposable development database.
 
-Start with the controller generator in the development bind mount:
+These are Make targets on the host. Application commands such as
+`apikey:generate` and `make:controller` run through `bin/console` inside PHP.
+For production, explicitly use the base Compose file, as shown in README:
+
+```sh
+docker compose -f compose.yaml up -d --force-recreate --wait
+docker compose -f compose.yaml down
+```
+
+## Create your first API key
+
+After the README's local quick start, `/health` is public, while `/users` and
+generated controller routes require an API key. A request without a valid key
+returns 401 with `WWW-Authenticate: ApiKey`; this is expected authentication behavior.
+
+1. Generate a key in the running PHP container:
+
+   ```sh
+   docker compose exec -T php bin/console apikey:generate mobile
+   ```
+
+   The command prints one plaintext `mobile:key` entry. Save the key part
+   (everything after the colon) securely for requests. Copy the whole line for
+   server configuration; no hash is generated.
+
+2. Edit `.env`: set `API_KEYS` to the complete output line. If entries
+   already exist, append the new entry with a comma, preserving existing entries.
+   `API_KEYS` stores plaintext credentials. Keep the key part in your client's
+   secret store as well, and restrict `.env` permissions with `chmod 600 .env`. Do not paste real credentials into documentation or commit them.
+
+3. Recreate PHP and Nginx to apply the changed environment:
+
+   ```sh
+   docker compose up -d --force-recreate --wait php nginx
+   ```
+
+4. In Bash, enter the plaintext key at a hidden prompt and make a request:
+
+   ```bash
+   read -r -s -p 'API key: ' API_KEY
+   printf '\n'
+   curl -i -H "X-Api-Key: $API_KEY" http://localhost:8082/users
+   ```
+
+   Paste only the key part after the colon, excluding the client label. This keeps
+   it out of the command text and shell history. Expected: 200 and the users JSON.
+   Keep using this Bash session for the examples below; repeat the hidden prompt
+   when opening a new session. For existing clients, follow [rotation](#rotate-an-api-key).
+
+## Add an endpoint
+
+Run this complete Make command from the repository root:
 
 ```sh
 make controller name=Greeting actions="show" routes=1
 ```
 
+Make's `controller` target takes `name=`, `actions=` and the optional `routes=1`.
+For example, `make controller name=Post actions="index show" routes=1` creates
+the two protected posts routes. Omit `routes=1` to print entries for manual registration.
+The equivalent complete console invocation for the greeting example is:
+
+```sh
+docker compose run --rm --no-deps php bin/console make:controller Greeting show --routes
+```
+
+`make:controller` is a `bin/console` subcommand; invoke it through the full
+command above. Its controller name and actions are positional arguments, and
+`--routes` is optional. Make uses a space in `make controller`.
+
 It creates `src/Controller/GreetingController.php` and inserts its protected route
 into `src/routes.php` with fully qualified class names, leaving imports alone.
-The equivalent console command is
-`docker compose run --rm --no-deps php bin/console make:controller Greeting show --routes`.
-Keep this exact marker inside the route array, including its indentation:
-
-```php
-    // make:controller: new routes are inserted above this line
-```
+The comment `// make:controller: new routes are inserted above this line` is a
+permanent insertion marker in `src/routes.php`. The generator inserts entries
+above it and leaves it in place for later runs. It is not a command or a missing
+route. Keep its exact text and four-space indentation inside the array.
 
 Existing route keys are skipped with a warning; repeating `--routes` reuses the
 controller without overwriting it. Requested actions must already exist when
@@ -76,8 +144,9 @@ strings, for example `/users/show?id=1`, and validate `$request->query` with
 `Validator::validate()` before using them (see [input validation](#validate-input));
 do not add `/users/{id}` placeholders.
 
-Use an API key configured as described in [rotation](#rotate-an-api-key). Set the
-shell variable `API_KEY` to the plaintext key you saved; only its hash goes in .env.
+Before the request, complete [first API key setup](#create-your-first-api-key)
+and use the same Bash session, where `API_KEY` holds the plaintext key. Generated
+routes are protected by ApiKeyAuth, so omitting the header returns 401.
 
 <!-- snippet: greeting-request -->
 ```sh
@@ -670,7 +739,7 @@ final class NotesExampleTest extends DatabaseTestCase
     {
         $environment = $_ENV;
         $key = bin2hex(random_bytes(16));
-        $_ENV['API_KEY_HASHES'] = 'notes:' . hash('sha256', $key);
+        $_ENV['API_KEYS'] = 'notes:' . hash('sha256', $key);
         try {
             $seed = require __DIR__ . '/../../database/seeds/notes.php';
             $seed['run']($this->pdo);
@@ -706,43 +775,45 @@ Use `X-Api-Key` with hyphens; `X_API_KEY` is dropped by Nginx's default header
 policy, which is left unchanged. Bearer authorization is supported as a fallback.
 A nonempty X-Api-Key takes precedence, so test one authentication header at a time.
 
-Entries are `client:sha256hex`, separated by commas. Names contain 1–64 ASCII
-letters/digits/underscores/hyphens and start with a letter or digit. A client can
-have multiple keys; the same credential should not be assigned to different
-clients. Whitespace around entries is allowed; trailing commas, missing clients,
-non-hex or non-64-character hashes invalidate the entire list. Bare hashes from
-the old format are rejected. Use `env:check` before a production deployment.
+Entries in `API_KEYS` are plaintext `client:key` pairs separated by commas.
+Client names contain 1–64 ASCII letters/digits/underscores/hyphens and start with
+a letter or digit. Keys contain ASCII letters/digits/underscores/hyphens and are
+case-sensitive; the generator produces 64 hex characters from 32 random bytes.
+Whitespace around complete entries is allowed. Empty entries, trailing commas,
+missing clients/keys and invalid characters reject the whole list.
+The supplied key is compared directly with `hash_equals`, without hashing.
+Use `env:check` before production deployment.
 
-Rotate the mobile client's key in three steps:
+Rotate the mobile client's key:
 
-1. Generate a replacement and save the plaintext key securely. It is 32 random
-   bytes encoded as 64 hex characters and is displayed once. The second line is
-   a complete `mobile:<hash>` entry; copy that entry into .env, not the key.
+1. Generate a replacement entry. It prints one `mobile:key` line; save the key
+   part in the client secret store and copy the whole line for server setup.
 
    <!-- snippet: rotate-generate -->
    ```sh
    docker compose exec -T php bin/console apikey:generate mobile
    ```
 
-2. Add the new mobile entry alongside the old mobile entry in API_KEY_HASHES,
-   separated by a comma, retaining other clients' entries. Recreate the containers
-   to load the updated environment. Both mobile keys now work; update clients
-   and verify the replacement. Set API_KEY to its new plaintext value.
+2. Add the new entry alongside the old one in `.env` API_KEYS, separated by a
+   comma, preserving other clients' entries. Recreate the containers:
 
    <!-- snippet: rotate-recreate -->
    ```sh
    docker compose up -d --force-recreate --wait php nginx
    ```
 
+   Both keys now work. Update the client and enter the replacement key in Bash:
+
    <!-- snippet: rotate-request -->
-   ```sh
+   ```bash
+   read -r -s -p 'API key: ' API_KEY
+   printf '\n'
    curl -i -H "X-Api-Key: $API_KEY" http://localhost:8082/users
    ```
 
-3. Remove only the old mobile entry and repeat the recreate command. The old key
-   must now return 401; the replacement and other clients' keys still return 200.
-   This removes the credential cutover gap, although a single PHP container still
-   restarts during recreation.
+3. Remove only the old entry and repeat the recreate command. The old key now
+   returns 401; the replacement and other clients' keys still return 200. A single
+   PHP container restarts during recreation, although both keys work during cutover.
 
 Successful authentication sets `$request->attributes['client']`. AccessLog adds
 that name to its JSON line, including for controller failures. Client labels are
@@ -751,10 +822,14 @@ and incorrect keys both return the same 401 message and `WWW-Authenticate: ApiKe
 An empty or malformed list fails closed and logs a warning without the key or
 configuration value. Production assertSafe rejects that configuration at startup.
 
+When migrating from `API_KEY_HASHES`, replace it with `API_KEYS` containing the
+original plaintext keys or generate new entries. Existing SHA-256 digests cannot
+recover the original keys; old-only configuration fails the required-variable check.
+
 If production configuration is incomplete, regular CLI commands are blocked.
 For the first key, build the prod image and run a disposable command without
 HTTP ports: `docker compose -f compose.yaml run --rm --no-deps -e APP_ENV=local php bin/console apikey:generate mobile`.
 Then finish .env and run env:check. For normal production rotation use
 `docker compose -f compose.yaml` throughout, with APP_DEBUG=0 and a non-wildcard
 CORS origin. Generation needs no database. API keys are unrelated to users'
-Argon2id passwords; never store plaintext API keys in .env or application logs.
+Argon2id passwords; keep plaintext API keys only in the private .env/client secret store, never in Git or application logs.

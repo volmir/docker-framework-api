@@ -1,6 +1,12 @@
 # REST Client / PhpStorm: set apiKey to a generated plaintext key.
-# Generate with: docker compose exec php bin/console apikey:generate mobile
-# Store the mobile:hash output in .env API_KEY_HASHES and recreate PHP/Nginx.
+# First-time setup: docs/cookbook.md#create-your-first-api-key
+# Generate with: docker compose exec -T php bin/console apikey:generate mobile
+# Output: one mobile:key line. Store the whole line in .env API_KEYS.
+# Set apiKey below to the key part after the colon; comparison is direct and case-sensitive.
+# Preserve existing entries with commas, then apply the edited .env:
+# docker compose up -d --force-recreate --wait php nginx
+# Keep real apiKey/password values local and out of commits.
+# An absent/incorrect key, or an empty API_KEYS setting, returns 401.
 # Send X-Api-Key with hyphens; X_API_KEY is not accepted by Nginx.
 # Defaults match .env.example; change baseUrl if APP_PORT differs.
 @baseUrl = http://localhost:8082
