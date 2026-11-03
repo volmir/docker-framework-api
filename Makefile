@@ -1,6 +1,6 @@
 COMPOSE = docker compose
 
-.PHONY: help check-env install up down logs sh migrate rollback status seed routes routes-check migration command controller middleware domain fresh test lint analyse check prod-check
+.PHONY: help check-env install up down restart logs sh migrate rollback status seed routes routes-check migration command controller middleware domain fresh test lint analyse check prod-check
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -17,6 +17,9 @@ up: check-env ## Build and start the application; wait for healthy containers
 
 down: check-env ## Stop the stack
 	$(COMPOSE) --profile test down
+
+restart: check-env ## Recreate MySQL, PHP and Nginx, apply .env and wait for health; keep database data
+	$(COMPOSE) up -d --force-recreate --wait
 
 logs: check-env ## Follow container logs
 	$(COMPOSE) logs -f
