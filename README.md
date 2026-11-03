@@ -452,7 +452,7 @@ file generators and key generation work without a database connection.
 | `routes [--check]` | Show global middleware and an aligned METHOD / PATH / HANDLER / MIDDLEWARE table in route file order; --check reports configuration errors and exits 1. |
 | `make:migration <name>` | Generate database/migrations/YYYYMMDDHHMMSS_name.php with empty up/down; name matches `[a-z][a-z0-9_]*`. |
 | `make:command <name>` | Generate commands/name.php, replacing `:` with `_`; name is action or group:action, matching `[a-z][a-z0-9]*(:[a-z][a-z0-9_]*)?`. |
-| `make:controller <Name> [action ...]` | Generate src/Controller/NameController.php; default action is index. Accepts StudlyCase or snake_case and removes a trailing Controller suffix; prints routes for manual registration. |
+| `make:controller <Name> [action ...] [--routes]` | Generate src/Controller/NameController.php; default action is index. Accepts StudlyCase or snake_case and removes a trailing Controller suffix; prints routes, or inserts them with --routes. |
 | `make:middleware <Name>` | Generate src/Middleware/Name.php; requires StudlyCase and prints global/per-route registration hints. |
 | `make:domain <Name>` | Generate src/Name/Name.php and tests/Name/NameTest.php; use a meaningful plural StudlyCase name such as Posts, without Service/Repository/Manager suffixes. Prints a migration hint. |
 
@@ -478,11 +478,21 @@ The suggested path is the snake_case class name plus `s` (`BlogPost` becomes
 `/blog_posts`). Index/show use GET, create uses POST, update uses PATCH, delete uses
 DELETE, and other actions use GET with the action appended to the path. Show uses
 `/<resource>/show` with query parameters. All suggested routes include ApiKeyAuth;
-POST/PATCH suggestions also include RequireJson. Generators never edit
-`src/routes.php` or `src/middleware.php`. They provide only a working skeleton;
+POST/PATCH suggestions also include RequireJson. Only `make:controller --routes`
+edits `src/routes.php`; generators never edit `src/middleware.php`. They provide only a working skeleton;
 developers add validation and SQL, using `UserController` as a working example.
 The scaffold accepts `Connection $_connection` as Router requires, without storing
 an unused property; promote it to a property when adding SQL.
+
+Keep the exact marker `    // make:controller: new routes are inserted above this line`
+inside the route array, including its four-space indentation; do not remove it.
+`--routes` inserts fully qualified entries above it without changing imports or
+parsing PHP source. Existing keys are skipped with a warning; an existing
+controller is reused without overwriting it, provided its requested actions exist.
+The update uses a temporary file and atomic rename, preserves mode/owner/group,
+then lints and reloads the table. Failures restore the original routes and print
+the entries for manual registration; a new controller is created only after the
+route update passes. A missing or ambiguous marker refuses before creating it.
 
 `routes` reads `src/routes.php` and `src/middleware.php` without constructing
 controllers or middleware or opening the database. `--check` verifies controller
@@ -515,7 +525,7 @@ nested transactions or savepoints. It uses `pdo()` in both normal and debug mode
 | `migrate` / `status` | Invoke database commands. |
 | `migration name=create_posts_table` | Generate an empty migration in the dev PHP container. |
 | `command name=report:users` | Generate a console command in the dev PHP container. |
-| `controller name=Post actions="index show"` | Generate a controller in dev and print protected routes to add manually. |
+| `controller name=Post actions="index show" routes=1` | Generate a controller in dev and insert protected routes; omit routes=1 to print them for manual registration. |
 | `middleware name=Throttle` | Generate pass-through middleware in dev and print registration hints. |
 | `domain name=Posts` | Generate a domain and its DatabaseTestCase constructor test in dev; print a migration hint. |
 | `routes` / `routes-check` | Show routes / run routes --check in a disposable PHP container without starting MySQL. |

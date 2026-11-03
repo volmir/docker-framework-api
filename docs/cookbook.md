@@ -11,11 +11,28 @@ before calling the notes endpoint, seed or command.
 Start with the controller generator in the development bind mount:
 
 ```sh
-make controller name=Greeting actions="show"
+make controller name=Greeting actions="show" routes=1
 ```
 
-It creates `src/Controller/GreetingController.php` and prints route entries.
-Add `use App\Controller\GreetingController;` to `src/routes.php` (ApiKeyAuth is
+It creates `src/Controller/GreetingController.php` and inserts its protected route
+into `src/routes.php` with fully qualified class names, leaving imports alone.
+The equivalent console command is
+`docker compose run --rm --no-deps php bin/console make:controller Greeting show --routes`.
+Keep this exact marker inside the route array, including its indentation:
+
+```php
+    // make:controller: new routes are inserted above this line
+```
+
+Existing route keys are skipped with a warning; repeating `--routes` reuses the
+controller without overwriting it. Requested actions must already exist when
+reusing a controller. Missing/ambiguous markers refuse before creating a new
+controller and print manual entries. Updates preserve permissions and ownership,
+use atomic rename, then run `php -l` and reload the table; failures restore the
+original file. Production refuses this mode like the other generators.
+
+For manual registration instead, omit `routes=1` (or `--routes`). Add
+`use App\Controller\GreetingController;` to `src/routes.php` (ApiKeyAuth is
 already imported), then paste the printed entry inside its route array:
 
 <!-- snippet: greeting-route -->
@@ -23,13 +40,13 @@ already imported), then paste the printed entry inside its route array:
 'GET /greetings/show' => [GreetingController::class, 'show', [ApiKeyAuth::class]],
 ```
 
-Check the manual registration:
+Check the registration:
 
 ```sh
 make routes-check
 ```
 
-The generator never edits route or global middleware registration. It provides
+The generator edits routes only with `--routes` and never edits global middleware. It provides
 only a working skeleton returning `{"data":[]}`; developers write SQL and
 validation. `src/Controller/UserController.php` is the working example. The
 constructor accepts `Connection $_connection` even when the endpoint does not use
